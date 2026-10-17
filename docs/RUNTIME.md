@@ -1,4 +1,4 @@
-Wallpaper scene runtime — Debian 13 x86_64 / GNOME Wayland
+# Wallpaper scene runtime — Debian 13 x86_64 / GNOME Wayland
 
 此目录可整体移动，不依赖 wallpaper_adapter 的源码、构建目录或 deps/sysroot。
 用途：本地场景与视频壁纸管理，静态背景、按需动态、全局帧率及定时轮换。
@@ -7,25 +7,36 @@ Wallpaper scene runtime — Debian 13 x86_64 / GNOME Wayland
 系统需提供 glibc、C++ 运行库、Mesa/OpenGL、Wayland、FFmpeg、PulseAudio/PipeWire 等共享库，
 完整依赖名称见 manifest.json。它是当前系统的独立运行目录，不是跨发行版静态程序。
 
-目录
-  bin/        相对路径启动、检查及手动配置命令
-  libexec/    C++ 渲染器
-  lib/        渲染核心库及系统缺少的私有运行库
-  assets/     WE 公共资源
-  wallpapers/ 壁纸库、预存静态图与缩略图
-  wallpaper/  旧版单壁纸预览资源（兼容）
-  gnome/      可安装的 GNOME 插件（含已编译 schema，revision 12）
-  licenses/   许可证说明
+## 目录
 
-独立预览（在任意工作目录执行）
-  /此目录/bin/check-runtime
-  /此目录/bin/preview
+```text
+bin/        相对路径启动、检查及手动配置命令
+libexec/    C++ 渲染器
+lib/        渲染核心库及系统缺少的私有运行库
+assets/     WE 公共资源
+wallpapers/ 壁纸库、预存静态图与缩略图
+wallpaper/  旧版单壁纸预览资源（兼容）
+gnome/      可安装的 GNOME 插件（含已编译 schema，revision 12）
+licenses/   许可证说明
+```
+
+## 独立预览（在任意工作目录执行）
+
+```text
+/此目录/bin/check-runtime
+/此目录/bin/preview
+```
+
 关闭预览窗口或终端 Ctrl+C 即可退出。
 启动脚本不会创建源码路径软链接，不需要 Steam 登录；缓存使用系统 XDG 用户目录。
 
-GNOME 部署（手动执行）
-  /此目录/bin/install-gnome
-  /此目录/bin/configure-gnome
+## GNOME 部署（手动执行）
+
+```text
+/此目录/bin/install-gnome
+/此目录/bin/configure-gnome
+```
+
 安装器暂存完整新版本并原子交换目录，保留旧版备份；不会修改设置或启用扩展。
 禁止原地覆盖已加载的 gschemas.compiled，也不要在活跃扩展目录中重新编译 schema。
 GNOME Wayland 已缓存旧模块时，需要注销后重新登录才能加载新版；之后手动启用插件。
@@ -42,17 +53,25 @@ GNOME Wayland 已缓存旧模块时，需要注销后重新登录才能加载新
 
 本目录只用于本机运行；用户提供的 WE 公共资源和 Workshop 壁纸并未被授予再分发许可。
 
-
 壁纸库数量由当前目录内容决定。管理界面支持“导入壁纸…”和“删除壁纸…”。
 导入可选择单张目录或含多张 project.json 子目录的目录，支持 scene/video；复制到运行库，不修改来源，同名跳过。
 导入时不启动渲染器；已有静态图会一起复制，缺图仍由用户显式开启动态后辅助生成。
 删除会先确认再移入系统回收站，删除当前播放项会先切换并等待旧渲染器退出。
 删除最后一张会关闭动态与轮换，保留原生静态背景。当前运行库内的操作不会删除导入来源。
 
-高质量静态图
-  bin/capture-static --scene /壁纸目录 --output /输出图片.png
+## 高质量静态图
+
+```text
+bin/capture-static --scene /壁纸目录 --output /输出图片.png
+```
+
 默认 scene 使用 4K 可见区域渲染后缩小为 1920×1080；video 从原生解码帧缩放。
 这是一次性任务，依赖本机 python3-gi/GdkPixbuf、gnome-shell、dbus-run-session 与 gdbus。
 使用私有合成器、DBus 和配置目录，完成或取消后退出；日常动态播放参数不变。
 缺图时显式开启动态才自动调用该任务，不覆盖用户已有静态图片。
 静态模式下概览/应用列表使用当前原生壁纸，退出菜单释放额外背景层，不启动渲染器。
+
+## 开源许可
+
+项目采用 GPL-3.0-only，目录内的 `LICENSE` 和 `NOTICE.md` 保存完整条款及来源说明；在线版本见[许可证](https://github.com/zcmmy/gnome-wallpaper/blob/main/LICENSE)和[归属声明](https://github.com/zcmmy/gnome-wallpaper/blob/main/NOTICE.md)。
+运行包中的用户壁纸、WE assets 和单独许可的库不因此被重新许可。

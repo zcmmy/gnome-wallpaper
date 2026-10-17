@@ -1,4 +1,4 @@
-GNOME 适配层
+# GNOME 适配层
 
 extension/ 是修改后的 GNOME 插件源码，由顶层 Git 管理。只负责进程管理、窗口归属/层级、概览副本、指针桥和设置界面。
 插件只认识一个可执行文件路径和 IPC 契约，不知道 C++ 的源码/构建目录。wallpaperengine-path 由部署层配置。
@@ -11,19 +11,22 @@ extension/ 是修改后的 GNOME 插件源码，由顶层 Git 管理。只负责
 scripts/live-desktop.js 与 apply-overview-fix.js 只是本地试运行工具，不进入插件发布包。
 它们通过项目位置定位 runtime/live-extension，不能代替正式的插件安装/版本兼容管理。
 运行时副本和当前会话的旧代码缓存保持原样；源码改动不会自动热更新当前 Shell。
-跨层协议见 ../integration/contracts/renderer-control-v1.txt。
+跨层协议见 [../integration/contracts/renderer-control-v1.md](../integration/contracts/renderer-control-v1.md)。
 
-管理界面与职责
-  extension.js          GNOME 标准入口，导出 wallpaperExtension.js
-  wallpaperExtension.js WaylandClient 进程/窗口、背景层、指针桥、概览生命周期
-  manager.js            静态/动态状态切换、定时轮换、辅助截图文件监听和状态发布
-  library.js            库扫描、路径校验、用户图片导入与缩略图
-  rotation.js           纯序列生成，无 Shell/渲染器依赖
-  rendererClient.js     有超时的短连接 JSON IPC，串行更新全局 FPS
-  staticWallpaper.js    GNOME 原生壁纸与首次配置备份/显式恢复
-  managerUi.js          GTK4/libadwaita 页面，不参与后台调度
-  prefs.js              GNOME 扩展首选项入口
-  managerApp.js         独立管理窗口入口，UI 和首选项共用同一实现
+## 管理界面与职责
+
+```text
+extension.js          GNOME 标准入口，导出 wallpaperExtension.js
+wallpaperExtension.js WaylandClient 进程/窗口、背景层、指针桥、概览生命周期
+manager.js            静态/动态状态切换、定时轮换、辅助截图文件监听和状态发布
+library.js            库扫描、路径校验、用户图片导入与缩略图
+rotation.js           纯序列生成，无 Shell/渲染器依赖
+rendererClient.js     有超时的短连接 JSON IPC，串行更新全局 FPS
+staticWallpaper.js    GNOME 原生壁纸与首次配置备份/显式恢复
+managerUi.js          GTK4/libadwaita 页面，不参与后台调度
+prefs.js              GNOME 扩展首选项入口
+managerApp.js         独立管理窗口入口，UI 和首选项共用同一实现
+```
 
 GSettings 保存 library-root、selected-id、enabled、fps、轮换参数与序列。
 runtime-status 仅为显示状态，DBus Snapshot 用于确认当前扩展实例是否存活。
@@ -37,7 +40,8 @@ GUI 通过设置变化发出命令，不持有渲染器；关闭 GUI 不影响�
 安装时使用打包/安装脚本，包含全部 *.js、captureWorker.py、libraryWorker.py、metadata.json 和 schemas。
 源码与运行包不共享壁纸修改；用户应编辑已部署运行包的 wallpapers/<ID>/static-background.png。
 
-安全更新
+## 安全更新
+
 用 python3 scripts/install-extension.py SOURCE DESTINATION 安装；或运行包的 bin/install-gnome。
 先在临时目录编译 schema，再原子交换整个扩展目录。旧实例继续读取旧 inode，新实例读取新 schema。
 禁止对运行中扩展使用 cp/copytree 覆盖 gschemas.compiled；该文件被 GSettings 内存映射，破坏后可能令整个 Shell 致命退出。

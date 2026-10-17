@@ -35,6 +35,9 @@ try:
  for f in (r/'gnome/extension/schemas').glob('*.gschema.xml'):shutil.copy2(f,ext/'schemas'/f.name)
  subprocess.run(['glib-compile-schemas','--strict',str(ext/'schemas')],check=True)
  shutil.copy2(r/'renderer/source/LICENSE',stage/'licenses/renderer-LICENSE')
+ for name in ['LICENSE','NOTICE.md']:
+  shutil.copy2(r/name,stage/name)
+  shutil.copy2(r/name,ext/name)
  # Keep license notices for the private libraries copied from the local sysroot.
  owners={'libGLEW.so.2.2':'libglew2.2','libmpv.so.2':'libmpv2','libglfw.so.3':'libglfw3','libmujs.so.3':'libmujs3','libavdevice.so.61':'libavdevice61','liblua5.2.so.0':'liblua5.2-0','libjack.so.0':'libjack0','libsndio.so.7':'libsndio7.0','libsixel.so.1':'libsixel1','libXpresent.so.1':'libxpresent1','libva-wayland.so.2':'libva-wayland2','libexpat.so.1':'libexpat1'}
  for soname,owner in owners.items():
@@ -107,7 +110,7 @@ if (!restoreStaticWallpaper()) throw new Error('No original background backup or
 Gio.Settings.sync();
 print('Original background restored.');
 ''',True)
- shutil.copy2(r/'docs/RUNTIME.txt', stage/'README.txt')
+ shutil.copy2(r/'docs/RUNTIME.md', stage/'README.md')
  files={str(f.relative_to(stage)):hashlib.sha256(f.read_bytes()).hexdigest() for f in stage.rglob('*') if f.is_file()}
  manifest={'format':1,'profile':'scene','os':pathlib.Path('/etc/os-release').read_text(),'arch':os.uname().machine,'project_version':(r/'VERSION').read_text().strip(),'project_commit':subprocess.check_output(['git','-C',str(r),'rev-parse','HEAD'],text=True).strip(),'renderer_commit':json.loads((r/'third_party/sources.lock.json').read_text())['components'][0]['commit'],'renderer_has_local_patches':True,'gnome_revision':12,'mutable_directories':['wallpapers/'],'mutable_files':[name for name in files if name.startswith('wallpapers/') and name.endswith(('/static-background.png','/thumbnail.jpg'))],'bundled_libraries':sorted(libs),'system_libraries':sorted(system),'files_sha256':files}
  write(stage/'manifest.json',json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')

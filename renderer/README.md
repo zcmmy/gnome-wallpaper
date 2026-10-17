@@ -1,4 +1,4 @@
-C++ 渲染层
+# C++ 渲染层
 
 source/ 是修改后的 portghost 源码快照，由顶层 Git 管理。职责：读取 WE 场景/资源、音频 FFT、脚本/动画/特效、OpenGL 绘制、通用窗口和输入接口。
 它不读取 GNOME 扩展源码或 GSettings，不导入 GNOME Shell；Meta.WaylandClient 提供的 WAYLAND_SOCKET 是标准 Wayland 连接环境。

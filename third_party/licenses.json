@@ -1,6 +1,10 @@
 {
   "renderer": "renderer/source/LICENSE",
-  "gnome_extension": null,
+  "gnome_extension": {
+    "upstream_spdx": "GPL-2.0-or-later",
+    "declaration": "gnome/extension/README.md#license",
+    "distribution_spdx": "GPL-3.0-only"
+  },
   "bundled_external_license_files": [
     "renderer/source/src/External/Catch2/LICENSE.txt",
     "renderer/source/src/External/ISPCTextureCompressor/license.txt",
@@ -23,5 +27,14 @@
     "renderer/source/src/External/quickjs/LICENSE",
     "renderer/source/src/External/stb/LICENSE",
     "renderer/source/src/External/stb/data/herringbone/license.txt"
-  ]
+  ],
+  "project": {
+    "spdx": "GPL-3.0-only",
+    "file": "LICENSE",
+    "notice": "NOTICE.md"
+  },
+  "upstream_lwe_ui": {
+    "spdx": "MIT",
+    "declaration": "renderer/source/lwe-ui/pyproject.toml"
+  }
 }

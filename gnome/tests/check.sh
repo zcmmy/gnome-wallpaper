@@ -25,7 +25,7 @@ python3 - "$stage/extension.zip" <<'VERIFY'
 import json,re,sys,zipfile
 with zipfile.ZipFile(sys.argv[1]) as z:
  names=set(z.namelist())
- assert {'metadata.json','extension.js','prefs.js','libraryWorker.py','captureWorker.py','libraryOps.js','pointerBridge.js','overviewWallpaper.js','staticWallpaper.js','schemas/gschemas.compiled'} <= names
+ assert {'LICENSE','NOTICE.md','metadata.json','extension.js','prefs.js','libraryWorker.py','captureWorker.py','libraryOps.js','pointerBridge.js','overviewWallpaper.js','staticWallpaper.js','schemas/gschemas.compiled'} <= names
  assert json.loads(z.read('metadata.json'))['uuid']=='wallpaperengine@waylandwe'
  assert not any(n.endswith(('.cpp','.h','.so')) or '.git/' in n or 'renderer/' in n for n in names)
  for n in names:

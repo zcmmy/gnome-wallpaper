@@ -7,6 +7,7 @@ output_zip="$1"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/schemas"
+cp "$extension_root/../../LICENSE" "$extension_root/../../NOTICE.md" "$stage/"
 cp "$extension_root"/captureWorker.py "$extension_root"/libraryWorker.py "$stage/"
 cp "$extension_root"/*.js "$extension_root/metadata.json" "$stage/"
 cp "$extension_root"/schemas/*.gschema.xml "$stage/schemas/"

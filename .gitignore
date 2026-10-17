@@ -5,11 +5,11 @@
 /deps/
 /build/
 /runtime/*
-!/runtime/README.txt
+!/runtime/README.md
 /reports/*
-!/reports/README.txt
+!/reports/README.md
 /backups/*
-!/backups/README.txt
+!/backups/README.md
 /logs/
 __pycache__/
 *.py[cod]

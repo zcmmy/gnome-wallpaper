@@ -1,4 +1,4 @@
-开发会话与测试环境（不同于 ../wallpaper-runtime 正式运行包）
+# 开发会话与测试环境（不同于 ../wallpaper-runtime 正式运行包）
 
 必须保留：live-extension/、live-desktop/、hq-live/、static-overview-live/。
 这些模块被当前 GNOME 会话或 Looking Glass 迁移入口引用，不能当作普通缓存删除。

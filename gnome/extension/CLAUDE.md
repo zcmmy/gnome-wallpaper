@@ -1,7 +1,7 @@
 # Local development guidance
 
 This directory is part of the top-level gnome-wallpaper Git repository.
-Read ../../README.txt, ../../docs/DEVELOPMENT.txt and ../README.txt for the current integration.
+Read ../../README.md, ../../docs/DEVELOPMENT.md and ../README.md for the current integration.
 Upstream docs in this directory describe the original extension and may be historical.
 
 - Keep renderer implementation separate from GNOME Shell, GTK and deployment code.

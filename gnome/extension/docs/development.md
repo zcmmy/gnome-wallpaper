@@ -1,4 +1,4 @@
-> Local workspace update: the renderer is now a separate component. This extension is packaged with `scripts/package.sh OUTPUT.zip`; it never builds the renderer or enables itself. The Fedora combined installer below is historical. Current integration: `../README.txt` and `../../integration/contracts/renderer-control-v1.txt`. The implementation uses Meta.WaylandClient.new/spawnv, a local socket pointer bridge and overview surface clones.
+> Local workspace update: the renderer is now a separate component. This extension is packaged with `scripts/package.sh OUTPUT.zip`; it never builds the renderer or enables itself. The Fedora combined installer below is historical. Current integration: `../README.md` and `../../integration/contracts/renderer-control-v1.md`. The implementation uses Meta.WaylandClient.new/spawnv, a local socket pointer bridge and overview surface clones.
 
 # Development Guide
 
