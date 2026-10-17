@@ -872,9 +872,8 @@ void CImage::setupPasses () {
 	std::shared_ptr<const CFBO> prevDrawTo = drawTo;
 	bool writesToTarget = false;
 	const bool isFirstPass = first;
-	GLuint spacePosition = (isFirstPass)
-	    ? (this->m_hasPuppetMesh ? this->m_puppetSpacePosition : this->getCopySpacePosition ())
-	    : this->getPassSpacePosition ();
+	const bool usesPuppetMesh = this->m_hasPuppetMesh && std::next (cur) == end;
+	GLuint spacePosition = isFirstPass ? this->getCopySpacePosition () : this->getPassSpacePosition ();
 	const glm::mat4* projection
 	    = (isFirstPass) ? &this->m_modelViewProjectionCopy : &this->m_modelViewProjectionPass;
 	const glm::mat4* inverseProjection
@@ -888,8 +887,18 @@ void CImage::setupPasses () {
 	);
 	first = false;
 
-	if (isFirstPass && this->m_hasPuppetMesh) {
-	    pass->setBlendingMode (BlendingMode_Translucent);
+	// Paint masks and displacement effects are authored in the source image's
+	// UV space. Deforming the first pass moves the image away from its masks.
+	// Apply the puppet only when compositing the completed effect chain.
+	if (usesPuppetMesh) {
+	    if (isFirstPass) {
+		pass->setBlendingMode (BlendingMode_Translucent);
+	    }
+	    spacePosition = this->m_puppetSpacePosition;
+	    projection = &this->m_modelViewProjectionCopy;
+	    inverseProjection = &this->m_modelViewProjectionCopyInverse;
+	    pass->setClassicLocalFrame (true);
+	    pass->setScreenViewProjectionMatrix (&this->m_lweScreenVPComposite);
 	    this->setupPuppetGeometryCallback (pass);
 	}
 
@@ -915,7 +924,7 @@ void CImage::setupPasses () {
 	    pass->setClassicLocalFrame (false);
 	    pass->setScreenViewProjectionMatrix (projection);
 
-	    if (isFirstPass && this->m_hasPuppetMesh && !this->m_puppetScreenSpace) {
+	    if (usesPuppetMesh && !this->m_puppetScreenSpace) {
 		this->m_puppetScreenSpace = true;
 		this->updatePuppetPositionBuffer (this->m_size);
 	    }
