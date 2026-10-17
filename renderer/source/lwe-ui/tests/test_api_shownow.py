@@ -1,0 +1,432 @@
+"""Self-verification for Backend.showNow - the engine `show` verb courier.
+
+Sandbox + stub discipline: HOME/XDG_* re-pointed per test, api_client stubbed in
+sys.modules BEFORE models is imported, so no socket traffic ever leaves the test.
+
+Contract under test:
+  * valid id, engine accepts  -> True, show() called once with the RESOLVED vocabulary;
+  * invalid / unsafe id       -> False, API never consulted;
+  * transport failure (None) / engine rejection (ok=false) / api layer raises -> False.
+
+Run: export PYTHONPATH=src && python3 tests/test_api_shownow.py
+"""
+from __future__ import annotations
+
+import _sandbox  # noqa: F401  (pins the engine socket before any lwe_ui import)
+import atexit
+import os
+import shutil
+import sys
+import tempfile
+import types
+import unittest
+from pathlib import Path
+
+_SRC = str(Path(__file__).resolve().parent.parent / "src")
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+_BOOT_HOME = tempfile.mkdtemp(prefix="lwe-apishow-boot-")
+atexit.register(shutil.rmtree, _BOOT_HOME, True)
+for _k, _sub in (("HOME", ""), ("XDG_CONFIG_HOME", "c"), ("XDG_STATE_HOME", "s"), ("XDG_DATA_HOME", "d")):
+    os.environ[_k] = os.path.join(_BOOT_HOME, _sub) if _sub else _BOOT_HOME
+
+# Stub the API courier, then import models ONCE against the stub.
+_API = types.ModuleType("lwe_ui.api_client")
+_API.available = lambda: False
+_API.show = lambda wid, wait_done=False, **kw: None
+sys.modules["lwe_ui.api_client"] = _API
+
+from PySide6.QtCore import QCoreApplication  # noqa: E402
+
+_APP = QCoreApplication.instance() or QCoreApplication(sys.argv[:1])
+
+from lwe_ui import models  # noqa: E402
+from lwe_ui.storage import paths, settings  # noqa: E402
+
+assert models.api_client is _API, "stub did not intercept models' api_client import"
+
+
+class ApiShowNowTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self._home = tempfile.mkdtemp(prefix="lwe-apishow-")
+        self.addCleanup(shutil.rmtree, self._home, True)
+        os.environ["HOME"] = self._home
+        os.environ["XDG_CONFIG_HOME"] = os.path.join(self._home, "c")
+        os.environ["XDG_STATE_HOME"] = os.path.join(self._home, "s")
+        os.environ["XDG_DATA_HOME"] = os.path.join(self._home, "d")
+        os.environ["XDG_RUNTIME_DIR"] = tempfile.mkdtemp(prefix="lwe-rt-")
+        self.addCleanup(shutil.rmtree, os.environ["XDG_RUNTIME_DIR"], True)
+
+        self.api_show_calls: list[str] = []
+        _API.available = lambda: False
+        _API.show = lambda wid, wait_done=False, **kw: (self.api_show_calls.append(wid), None)[1]
+
+        self.backend = models.Backend()
+
+    def _flag(self, on: bool) -> None:
+        # era flags are gone; kept as a no-op seam so the vocabulary tests read unchanged
+        settings.save(settings.load())
+
+    def test_api_show_used(self) -> None:
+        _API.available = lambda: True
+        _API.show = lambda wid, wait_done=False, **kw: (
+            self.api_show_calls.append(wid),
+            {"id": 1, "ok": True, "status": "accepted"},
+        )[1]
+        ok = self.backend.showNow("3134543499")
+        self.assertTrue(ok)
+        self.assertEqual(self.api_show_calls, ["3134543499"])
+
+    def test_invalid_id_rejected_without_api_call(self) -> None:
+        # a sentinel that only throws proves nothing, since showNow swallows exceptions
+        # and returns False either way; the recorder is what shows the API was not called
+        _API.show = lambda wid, wait_done=False, **kw: (
+            self.api_show_calls.append(wid),
+            {"id": 1, "ok": True, "status": "accepted"},
+        )[1]
+        for bad in ("", "  ", "../etc", "a b", "id;rm"):
+            self.assertFalse(self.backend.showNow(bad), f"unsafe id {bad!r} was shown")
+        self.assertEqual(self.api_show_calls, [], "an unsafe id reached the API")
+
+    def test_transport_failure_returns_false(self) -> None:
+        _API.show = lambda wid, wait_done=False, **kw: None
+        self.assertFalse(self.backend.showNow("3134543499"))
+
+    def test_engine_rejection_returns_false(self) -> None:
+        _API.show = lambda wid, wait_done=False, **kw: {"id": 1, "ok": False, "error": "not in library"}
+        self.assertFalse(self.backend.showNow("3134543499"))
+
+    def test_resolved_render_settings_ride_along(self) -> None:
+        """The wp conf's CC/SPEED must reach the API show."""
+        from lwe_ui.storage import wp
+
+        self._flag(True)
+        wp.save("3600585591", {"CC": "1.02 1.52 2.0 -0.125664", "SPEED": 2.5})
+
+        captured: dict = {}
+
+        def _show(wid, wait_done=False, cc=None, speed=None, properties=None, **kw):
+            captured.update(wid=wid, cc=cc, speed=speed)
+            return {"id": 1, "ok": True, "status": "accepted"}
+
+        _API.available = lambda: True
+        _API.show = _show
+
+        self.assertTrue(self.backend.showNow("3600585591"))
+        self.assertEqual(captured["cc"], [1.02, 1.52, 2.0, -0.125664])
+        self.assertEqual(captured["speed"], 2.5)
+
+    def test_full_show_vocabulary_rides_along(self) -> None:
+        """The WHOLE conf vocabulary reaches the API show resolved -
+        scaling/clamp/volume/audio/mouse/automute/fullscreen_pause/skip_objects, with
+        conf overriding globals and the global timescale factored into speed."""
+        from lwe_ui.storage import wp
+
+        self._flag(True)
+        settings.save({"ENGINE_TIMESCALE": 2.0, "ENGINE_VOLUME": 40,
+                       "PAUSE_RECOVERY_ACTION": "pause", "PAUSE_RECOVERY_CONDITION": "both"})
+        wp.save("3134543499", {"SPEED": 1.5, "SCALING": "fill", "CLAMPING": "border",
+                               "VOLUME": 80, "AUDIO_REACTIVE": True, "MOUSE": True,
+                               "AUTOMUTE": False, "SKIP": "27 539"})
+
+        captured: dict = {}
+
+        def _show(wid, wait_done=False, **kw):
+            captured.update(kw, wid=wid)
+            return {"id": 1, "ok": True, "status": "accepted"}
+
+        _API.available = lambda: True
+        _API.show = _show
+
+        self.assertTrue(self.backend.showNow("3134543499"))
+        self.assertEqual(captured["scaling"], "fill")
+        self.assertEqual(captured["clamp"], "border")
+        self.assertEqual(captured["volume"], 80)
+        self.assertTrue(captured["audio_processing"])
+        self.assertTrue(captured["mouse"])
+        self.assertFalse(captured["automute"])
+        self.assertTrue(captured["fullscreen_pause"], "policy pause+both must inherit as ON")
+        self.assertEqual(captured["skip_objects"], [27, 539])
+        self.assertAlmostEqual(captured["speed"], 1.5, msg="a set SPEED replaces the global 2.0")
+
+    def test_speed_override_clamped_to_engine_range(self) -> None:
+        """A wallpaper's SPEED replaces the global; the global applies only when the
+        wallpaper sets none; the panel resolves and clamps in one place, so a value over
+        the engine's ceiling still lands as an accepted show at the ceiling."""
+        from lwe_ui import constants as C
+        from lwe_ui.storage import wp
+
+        self._flag(True)
+        settings.save({"ENGINE_TIMESCALE": 10.0})
+        wp.save("3134543499", {"SPEED": 25.0})
+
+        captured: dict = {}
+
+        def _show(wid, wait_done=False, **kw):
+            captured.update(kw, wid=wid)
+            return {"id": 1, "ok": True, "status": "accepted"}
+
+        _API.available = lambda: True
+        _API.show = _show
+
+        self.assertTrue(self.backend.showNow("3134543499"))
+        self.assertAlmostEqual(captured["speed"], C.ENGINE_SPEED_MAX)
+        self.assertAlmostEqual(C.resolve_speed(3.0, 2.0), 3.0, "a set SPEED wins outright")
+        self.assertAlmostEqual(C.resolve_speed(None, None), 1.0)
+        self.assertAlmostEqual(C.resolve_speed("", 2.0), 2.0, "absent inherits the global")
+        self.assertAlmostEqual(C.resolve_speed("x", 2.0), 2.0, "an unreadable value inherits")
+        self.assertAlmostEqual(C.resolve_speed(0.0, 5.0), 0.0, "an explicit 0 is a value")
+        # the live doors resolve the same number through the same helper
+        self.assertAlmostEqual(models.effective_speed("3134543499", 10.0), C.ENGINE_SPEED_MAX)
+        self.assertAlmostEqual(models.effective_speed("3134543499", 0.5), C.ENGINE_SPEED_MAX)
+        self.assertAlmostEqual(models.effective_speed("", 3.0), 3.0)
+        # a wallpaper whose file carries no SPEED inherits the global; the store fills the
+        # schema default on a plain load, which must not read as a set value
+        from lwe_ui.storage import paths
+        paths.wp_file("3134543499").write_text("BG=3134543499\nSCALING=fill\n", encoding="utf-8")
+        settings.save({"ENGINE_TIMESCALE": 2.5})
+        self.assertAlmostEqual(models.effective_speed("3134543499"), 2.5)
+        self.assertTrue(self.backend.showNow("3134543499"))
+        self.assertAlmostEqual(captured["speed"], 2.5, "absent SPEED inherits the global")
+
+    def test_vocabulary_defaults_and_overrides(self) -> None:
+        """Untouched conf: schema defaults ride (editor confs pin every key - SCALING
+        'default', VOLUME 0 = silent, exactly what the watcher launched); session
+        overrides (mute/audio-off/mouse-off) force their side OFF regardless."""
+        from lwe_ui.storage import wp
+
+        self._flag(True)
+        settings.save({"AUDIO_REACTIVE_DEFAULT": True,
+                       "MOUSE_DEFAULT": True, "OVERRIDE_MUTE": True,
+                       "OVERRIDE_AUDIO_OFF": True, "OVERRIDE_MOUSE_OFF": True})
+        wp.save("3134543499", {"VOLUME": 80, "AUDIO_REACTIVE": True, "MOUSE": True})
+
+        captured: dict = {}
+
+        def _show(wid, wait_done=False, **kw):
+            captured.update(kw, wid=wid)
+            return {"id": 1, "ok": True, "status": "accepted"}
+
+        _API.available = lambda: True
+        _API.show = _show
+
+        self.assertTrue(self.backend.showNow("3134543499"))
+        self.assertEqual(captured["scaling"], "default", "untouched conf pins schema default")
+        self.assertNotIn("clamp", captured, "empty clamp must be omitted (engine default)")
+        self.assertEqual(captured["volume"], 0, "OVERRIDE_MUTE wins over the conf volume")
+        self.assertFalse(captured["audio_processing"], "OVERRIDE_AUDIO_OFF wins over conf true")
+        self.assertFalse(captured["mouse"], "OVERRIDE_MOUSE_OFF wins over conf true")
+        self.assertTrue(captured["automute"], "AUTOMUTE default is on")
+        self.assertFalse(captured["fullscreen_pause"], "condition=off means no engine pause")
+        self.assertNotIn("skip_objects", captured, "no conf SKIP -> omitted")
+
+    def test_conf_volume_zero_stays_silent(self) -> None:
+        """Key-presence: a conf that CARRIES VOLUME means it, zero included (zero =
+        deliberately muted). The presence check is why the global fallback below is
+        safe where a truthiness fallback never was."""
+        from lwe_ui.storage import wp
+
+        self._flag(True)
+        settings.save({"ENGINE_VOLUME": 55})
+        wp.save("3134543499", {"VOLUME": 0})
+
+        captured: dict = {}
+
+        def _show(wid, wait_done=False, **kw):
+            captured.update(kw, wid=wid)
+            return {"id": 1, "ok": True, "status": "accepted"}
+
+        _API.available = lambda: True
+        _API.show = _show
+
+        self.assertTrue(self.backend.showNow("3134543499"))
+        self.assertEqual(captured["volume"], 0, "conf VOLUME=0 means silent, not 'inherit'")
+
+    def test_absent_volume_key_inherits_global(self) -> None:
+        """Key-presence: a conf WITHOUT a VOLUME line inherits the
+        global ENGINE_VOLUME. update_set VOLUME=None is the sweep's exact operation,
+        so this is also the sweep's contract test."""
+        from lwe_ui.storage import wp
+
+        self._flag(True)
+        settings.save({"ENGINE_VOLUME": 55})
+        wp.save("3134543499", {"SPEED": 1.5})
+        wp.update_set("3134543499", {"VOLUME": None})
+
+        captured: dict = {}
+
+        def _show(wid, wait_done=False, **kw):
+            captured.update(kw, wid=wid)
+            return {"id": 1, "ok": True, "status": "accepted"}
+
+        _API.available = lambda: True
+        _API.show = _show
+
+        self.assertTrue(self.backend.showNow("3134543499"))
+        self.assertEqual(captured["volume"], 55, "absent VOLUME key -> global ENGINE_VOLUME")
+
+    def _shown(self, wid: str) -> dict:
+        captured: dict = {}
+
+        def _show(wid, wait_done=False, **kw):
+            captured.update(kw, wid=wid)
+            return {"id": 1, "ok": True, "status": "accepted"}
+
+        _API.available = lambda: True
+        _API.show = _show
+        self.assertTrue(self.backend.showNow(wid))
+        return captured
+
+    def test_absent_scaling_key_inherits_global(self) -> None:
+        """A file without SCALING follows ENGINE_SCALING; a file that carries SCALING keeps
+        it, the schema default included."""
+        from lwe_ui.storage import wp
+
+        settings.save({"ENGINE_SCALING": "fill"})
+        wp.save("3134543499", {"SPEED": 1.5})
+        wp.update_set("3134543499", {"SCALING": None})
+        self.assertEqual(self._shown("3134543499")["scaling"], "fill",
+                         "absent SCALING key -> global ENGINE_SCALING")
+        wp.update_set("3134543499", {"SCALING": "default"})
+        self.assertEqual(self._shown("3134543499")["scaling"], "default",
+                         "a present SCALING wins over the global")
+
+    def test_absent_audio_reactive_key_inherits_global(self) -> None:
+        """A file without AUDIO_REACTIVE follows AUDIO_REACTIVE_DEFAULT; a file that carries
+        AUDIO_REACTIVE=false keeps it."""
+        from lwe_ui.storage import wp
+
+        settings.save({"AUDIO_REACTIVE_DEFAULT": True})
+        wp.save("3134543499", {"SPEED": 1.5})
+        wp.update_set("3134543499", {"AUDIO_REACTIVE": None})
+        self.assertTrue(self._shown("3134543499")["audio_processing"],
+                        "absent AUDIO_REACTIVE key -> global AUDIO_REACTIVE_DEFAULT")
+        wp.update_set("3134543499", {"AUDIO_REACTIVE": False})
+        self.assertFalse(self._shown("3134543499")["audio_processing"],
+                         "a present AUDIO_REACTIVE wins over the global")
+
+    def test_absent_mouse_key_inherits_global(self) -> None:
+        """A file without MOUSE follows MOUSE_DEFAULT; a file that carries MOUSE=false keeps it."""
+        from lwe_ui.storage import wp
+
+        settings.save({"MOUSE_DEFAULT": True})
+        wp.save("3134543499", {"SPEED": 1.5})
+        wp.update_set("3134543499", {"MOUSE": None})
+        self.assertTrue(self._shown("3134543499")["mouse"], "absent MOUSE key -> global MOUSE_DEFAULT")
+        wp.update_set("3134543499", {"MOUSE": False})
+        self.assertFalse(self._shown("3134543499")["mouse"], "a present MOUSE wins over the global")
+
+    def test_absent_automute_key_inherits_global(self) -> None:
+        """A file without AUTOMUTE follows AUTOMUTE_DEFAULT; a file that carries AUTOMUTE=true
+        keeps it."""
+        from lwe_ui.storage import wp
+
+        settings.save({"AUTOMUTE_DEFAULT": False})
+        wp.save("3134543499", {"SPEED": 1.5})
+        wp.update_set("3134543499", {"AUTOMUTE": None})
+        self.assertFalse(self._shown("3134543499")["automute"],
+                         "absent AUTOMUTE key -> global AUTOMUTE_DEFAULT")
+        wp.update_set("3134543499", {"AUTOMUTE": True})
+        self.assertTrue(self._shown("3134543499")["automute"], "a present AUTOMUTE wins over the global")
+
+    def test_absent_cc_key_takes_the_authored_grade(self) -> None:
+        """A file without CC shows the color grade the wallpaper's project authors; a file that
+        carries CC keeps it, identity included."""
+        import json
+
+        from lwe_ui.storage import wp
+
+        project = Path(settings.load()["WALLPAPERS_DIR"]) / "3134543499"
+        project.mkdir(parents=True)
+        (project / "project.json").write_text(
+            json.dumps({"title": "graded", "type": "scene", "preset": {"wec_brs": 75}}), encoding="utf-8")
+        wp.save("3134543499", {"SPEED": 1.5})
+        wp.update_set("3134543499", {"CC": None})
+        self.assertEqual(self._shown("3134543499")["cc"], [1.5, 1.0, 1.0, 0.0],
+                         "absent CC key -> the project's authored grade")
+        wp.update_set("3134543499", {"CC": "1 1 1 0"})
+        self.assertEqual(self._shown("3134543499")["cc"], [1.0, 1.0, 1.0, 0.0],
+                         "a present CC wins over the authored grade")
+
+    def test_preset_resolves_to_base_wallpaper(self) -> None:
+        """A preset's conf BG names the real wallpaper; the API gets the BASE id plus
+        the preset's render settings."""
+        from lwe_ui.storage import wp
+
+        self._flag(True)
+        wp.save(
+            "3600585591",
+            {"BG": "/somewhere/lwe/wallpapers/2981249186", "CC": "1.02 1.52 2.0 -0.125664", "SPEED": 1.0},
+        )
+
+        captured: dict = {}
+
+        def _show(wid, wait_done=False, cc=None, speed=None, properties=None, **kw):
+            captured.update(wid=wid, cc=cc)
+            return {"id": 1, "ok": True, "status": "accepted"}
+
+        _API.available = lambda: True
+        _API.show = _show
+
+        self.assertTrue(self.backend.showNow("3600585591"))
+        self.assertEqual(captured["wid"], "2981249186", "engine must get the BASE id, not the preset id")
+        self.assertEqual(captured["cc"], [1.02, 1.52, 2.0, -0.125664], "with the PRESET's grade")
+
+    def test_preset_props_ride_along(self) -> None:
+        """A preset IS its PROP_ overrides, so the
+        conf's props dict must reach the API show as raw strings."""
+        from lwe_ui.storage import wp
+
+        self._flag(True)
+        wp.save(
+            "3410648253",
+            {
+                "BG": "/somewhere/lwe/wallpapers/2185197772",
+                "props": {"schemecolor": "0 0 0", "side": "centerblack", "stars": "false"},
+            },
+        )
+
+        captured: dict = {}
+
+        def _show(wid, wait_done=False, cc=None, speed=None, properties=None, **kw):
+            captured.update(wid=wid, properties=properties)
+            return {"id": 1, "ok": True, "status": "accepted"}
+
+        _API.available = lambda: True
+        _API.show = _show
+
+        self.assertTrue(self.backend.showNow("3410648253"))
+        self.assertEqual(captured["wid"], "2185197772")
+        self.assertEqual(
+            captured["properties"],
+            {"schemecolor": "0 0 0", "side": "centerblack", "stars": "false"},
+            "the preset's PROP_ overrides must ride the show, raw strings",
+        )
+
+    def test_missing_conf_sends_identity(self) -> None:
+        """No wp conf on disk: the click still goes through with identity settings."""
+        self._flag(True)
+        captured: dict = {}
+
+        def _show(wid, wait_done=False, cc=None, speed=None, properties=None, **kw):
+            captured.update(cc=cc, speed=speed)
+            return {"id": 1, "ok": True, "status": "accepted"}
+
+        _API.available = lambda: True
+        _API.show = _show
+
+        self.assertTrue(self.backend.showNow("3134543499"))
+        self.assertEqual(captured["cc"], [1.0, 1.0, 1.0, 0.0])
+        self.assertEqual(captured["speed"], 1.0)
+
+    def test_api_exception_returns_false(self) -> None:
+        _API.show = lambda wid, wait_done=False, **kw: (_ for _ in ()).throw(
+            RuntimeError("socket exploded"))
+        self.assertFalse(self.backend.showNow("3134543499"))
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

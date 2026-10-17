@@ -1,0 +1,23 @@
+# Local assets and deployed user state (never publish Workshop content).
+/assets/
+/wallpapers/
+/wallpaper/
+/deps/
+/build/
+/runtime/*
+!/runtime/README.txt
+/reports/*
+!/reports/README.txt
+/backups/*
+!/backups/README.txt
+/logs/
+__pycache__/
+*.py[cod]
+gschemas.compiled
+.env
+.env.*
+!.env.example
+*.log
+.idea/
+.vscode/
+.DS_Store

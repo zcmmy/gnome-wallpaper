@@ -1,0 +1,39 @@
+开发与部署
+
+模块边界
+C++ 只负责资源解析、脚本/动画/频谱、OpenGL、Wayland 和通用输入/IPC。
+GNOME 负责窗口归属/层级、原生静态背景、概览、鼠标桥、UI 和进程生命周期。
+插件不链接 C++ 库；IPC 不传送帧图像。配置通过 GSettings，画面通过 Wayland surface。
+独立截图辅助任务属于 GNOME 适配工具，使用同一个渲染可执行程序；不常驻。
+
+构建
+  make renderer
+  make extension
+  make build
+渲染入口：renderer/scripts/build.sh、run.sh、preview.sh。
+BUILD_JOBS 控制构建并发；WALLPAPER_BUILD_DIR 可指定新构建目录。
+已有 build/portghost 缓存含旧 sources/ 绝对路径，sources/linux-wallpaperengine-portghost 链接必须保留。
+默认新构建位置为 build/renderer，实际复用规则以 build.sh 为准，勿手改 CMakeCache.txt。
+WALLPAPER_RENDERER_BIN 可指定已构建程序；WALLPAPER_SCENE/WALLPAPER_ASSETS 可覆盖预览资源。
+deps/sysroot/usr 通过 renderer/scripts/env.sh 注入工具链路径，不安装到系统目录。
+
+打包与安装
+  make package DEST=/一个尚不存在的新目录
+  python3 integration/tests/check-runtime-bundle.py /运行目录
+打包生成可整体移动的运行包，不安装插件或修改设置。
+安装器：gnome/scripts/install-extension.py SOURCE DESTINATION，或运行包 bin/install-gnome。
+安装器在暂存目录编译 schema 后原子交换整个插件目录，并保留旧目录。
+不要原地覆盖已加载的 gschemas.compiled 或在活动扩展目录中重新编译 schema；GSettings 映射其 inode。
+更新可执行文件/共享库也应复制到临时文件后 rename，避免截断运行中的映射。
+
+当前会话
+GNOME Wayland 会缓存已导入模块；复制文件不等于更新当前实例。
+gnome/scripts/ 下的 apply-*.js / activate-manager.js 是显式 Looking Glass 会话迁移工具，
+只在了解当前版本时手动使用，不是服务、启动项或通用发布系统。
+runtime/live-extension、hq-live、static-overview-live 仍被当前会话或迁移工具引用，必须保留。
+常规 enable 会持久化扩展启用状态；本项目不自动执行，也不更改已有启用列表。
+
+版本与来源
+顶层 Git 统一管理源码，版本和上游更新流程见 VERSIONING.txt。
+固定上游及许可证位于 third_party/；原嵌套仓库数据保存在本机 backups/git-v0-*。
+当前集成以顶层 README.txt、docs/*.txt、contracts 为准；上游文档保留作来源参考。

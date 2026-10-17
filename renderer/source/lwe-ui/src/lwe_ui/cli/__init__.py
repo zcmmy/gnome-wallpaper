@@ -1,0 +1,170 @@
+"""The command entry: one lwe command in a process that never imports Qt.
+
+The first word names the verb and the rest are its arguments; -j or --json anywhere on the line
+asks for JSON output. Verbs come from the modules in lwe_ui.cli.verbs (see registry), and each
+returns its exit code: DONE 0, REFUSED 1, ENGINE_DOWN 2, USAGE 3. Every line goes out as UTF-8
+through clean(), as the engine writes its own output, and a closed output pipe ends the command
+quietly with PIPE_CLOSED. A run that ended applied during the verb with a re-show the engine held, or on
+an engine whose status reported restore_refused true, prints the brake note once through ctx.note
+after the verb's own output (engine/push.brake_notes).
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+import unicodedata
+from dataclasses import dataclass
+from typing import Any, Iterable, TextIO
+
+from .. import version
+from . import registry
+
+DONE = 0
+REFUSED = 1
+ENGINE_DOWN = 2
+USAGE = 3
+PIPE_CLOSED = 141
+
+_JSON_FLAGS = ("-j", "--json")
+_HELP_FLAGS = ("--help", "-h", "--h")
+
+
+class _Unsafe(dict):
+    """The translate table clean() uses: every control character but the newline (C0, U+007F and the C1
+    range U+0080 to U+009F) and every format character (category Cf, the bidi controls among them) maps
+    to "?", any other character to itself; each answer is kept once asked."""
+
+    def __missing__(self, code: int) -> str:
+        char = chr(code)
+        unsafe = char != "\n" and (code < 0x20 or 0x7F <= code <= 0x9F or unicodedata.category(char) == "Cf")
+        self[code] = "?" if unsafe else char
+        return self[code]
+
+
+_UNSAFE = _Unsafe()
+_NO_BYTE = re.compile(r"[\ud800-\udc7f\udd00-\udfff]")
+
+
+def clean(text: str) -> str:
+    """The text as the engine writes it: its original bytes read again as UTF-8, each invalid sequence
+    one U+FFFD (a lone surrogate that stands for no byte is one U+FFFD as well), then every control
+    character but the newline and every format character as "?" (_Unsafe), so no text can move the
+    terminal's cursor or reorder a line."""
+    text = _NO_BYTE.sub("\ufffd", text).encode("utf-8", "surrogateescape").decode("utf-8", "replace")
+    return text.translate(_UNSAFE)
+
+
+class _Cleaned:
+    """A stream that cleans each string before the real stream writes it."""
+
+    def __init__(self, stream: TextIO) -> None:
+        self._stream = stream
+
+    def write(self, text: str) -> int:
+        return self._stream.write(clean(text))
+
+    def writelines(self, lines: Iterable[str]) -> None:
+        for line in lines:
+            self.write(line)
+
+    def flush(self) -> None:
+        self._stream.flush()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._stream, name)
+
+
+def _silence_output() -> None:
+    """Point stdout and stderr at /dev/null, so the flush at exit cannot fail on a closed pipe."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            fd = stream.fileno()
+        except (AttributeError, ValueError, OSError):
+            continue
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, fd)
+        os.close(devnull)
+
+
+@dataclass(frozen=True)
+class Context:
+    """What a verb gets besides its words: the output mode, the two streams, which clean each string
+    they write, the version stamp of the lwe that sent the command, and whether the sender's working
+    folder was entered."""
+    json: bool
+    out: TextIO
+    err: TextIO
+    sender_stamp: str | None
+    cwd_entered: bool
+
+    def error(self, message: str, line: str | None = None) -> None:
+        """Print a refusal or usage error on err: in text mode the line (the message when no line
+        is given), under -j {"error":message} on one line."""
+        if self.json:
+            print(json.dumps({"error": message}, ensure_ascii=False, separators=(",", ":")),
+                  file=self.err)
+        else:
+            print(message if line is None else line, file=self.err)
+
+    def note(self, message: str) -> None:
+        """Print a note on err after the verb's own output: in text mode the message, under -j
+        {"note":message} on one line."""
+        if self.json:
+            print(json.dumps({"note": message}, ensure_ascii=False, separators=(",", ":")), file=self.err)
+        else:
+            print(message, file=self.err)
+
+
+def main(argv: list[str], *, sender_stamp: str | None = None, cwd_entered: bool = False) -> int:
+    """The verb's exit code, or PIPE_CLOSED when a write or a flush on stdout or stderr meets a
+    closed pipe."""
+    try:
+        return _main(argv, sender_stamp, cwd_entered)
+    except BrokenPipeError:
+        _silence_output()
+        return PIPE_CLOSED
+
+
+def _main(argv: list[str], sender_stamp: str | None, cwd_entered: bool) -> int:
+    from ..storage.lock import StoreBusy
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors=stream.errors)
+    words = [w for w in argv if w not in _JSON_FLAGS]
+    ctx = Context(len(words) != len(argv), _Cleaned(sys.stdout), _Cleaned(sys.stderr), sender_stamp,
+                  cwd_entered)
+    if words and words[0] in _HELP_FLAGS:
+        words = ["help", *words[1:]]
+    if not words:
+        ctx.error("usage: lwe [-j] <command> [value ...]")
+        return USAGE
+    try:
+        verb = registry.discover().get(words[0])
+        if verb is None:
+            ctx.error(f"{words[0]} is not a command", f"lwe: {words[0]} is not a command")
+            return USAGE
+        if verb.name != "help":
+            try:
+                refusal = version.sender_refusal(ctx.sender_stamp, version.panel_stamp())
+            except version.StampError as exc:
+                refusal = str(exc)
+            if refusal is not None:
+                ctx.error(refusal)
+                return REFUSED
+        code = verb.run(ctx, words[1:])
+        ctx.out.flush()
+        push = sys.modules.get("lwe_ui.engine.push")
+        for note in push.brake_notes() if push is not None else ():
+            ctx.note(note)
+        return code
+    except StoreBusy as exc:
+        ctx.error(str(exc))
+        return REFUSED
+    except BrokenPipeError:
+        raise
+    except Exception as exc:
+        one_line = " ".join(str(exc).splitlines())
+        ctx.error(f"internal error: {type(exc).__name__}: {one_line}")
+        return REFUSED

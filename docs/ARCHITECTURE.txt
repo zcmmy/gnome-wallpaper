@@ -1,0 +1,30 @@
+v0 架构
+
+GNOME 层：extension.js -> wallpaperExtension.js + manager.js。
+GTK4/libadwaita 的 managerUi.js 通过 GSettings 控制模式、选择、FPS 和轮换。
+UI 不渲染壁纸；关掉窗口后由 Shell 插件维持状态，Snapshot D-Bus 接口提供运行状态。
+
+静态路径
+选择壁纸 -> 验证 static-background.png -> 写入 GNOME picture-uri 与 picture-uri-dark。
+普通桌面由 GNOME 原生背景绘制；概览/应用列表可见时 staticOverview.js 创建原生 BackgroundManager。
+退出概览释放该层。静态模式没有渲染器、频谱采集和指针桥；开启轮换时保留切换定时器。
+
+动态路径
+显式动态开关 -> 先应用静态图 -> WaylandClient 启动独立 C++ 进程 -> 归属检查 -> 背景层嵌入。
+C++ 解析 pkg/JSON、动画和脚本，处理频谱、视差和 GPU 绘制，以 Wayland surface 提供画面。
+GNOME 不复制 CPU 图像帧；overviewWallpaper.js 复用动态 surface 的克隆。
+pointerBridge.js 把桌面鼠标坐标送入本地 IPC；rendererClient.js 更新 FPS。
+切换时停止旧后端，动态开关沿用，画面就绪前仍有静态图；失败保留静态背景并显示错误。
+
+静态截图路径
+用户自定义图片优先。没有静态图且用户明确开启动态时，启动 captureWorker.py 一次性任务。
+截图任务使用隔离的 DBus、XDG 目录和 headless GNOME，会临时启动独立渲染进程。
+场景可见区域按 4K 渲染并重采样到 1080p；视频从原生解码帧缩小。
+保存 PNG/缩略图并应用原生背景；成功、超时、取消或禁用均回收子进程。
+普通播放不携带 screenshot 参数，因此临时高质量截图不提高日常渲染分辨率。
+
+边界
+renderer/source 是渲染层源码；gnome/extension 是 Shell/GTK/任务适配层。
+integration/contracts/renderer-control-v1.txt 定义 CLI、指针/FPS IPC 与截图接口。
+运行包复制程序、私有库、用户资源和插件；不通过软链接依赖开发目录。
+布局、主题和 Dock/顶栏配置不由本项目管理；测试会在私有会话复制相关扩展配置作兼容验证。

@@ -1,0 +1,139 @@
+#include "WallpaperParser.h"
+
+#include "ObjectParser.h"
+#include "WallpaperEngine/Data/Model/Project.h"
+#include "WallpaperEngine/Data/Model/Wallpaper.h"
+#include "WallpaperEngine/FileSystem/Container.h"
+#include "WallpaperEngine/Logging/Log.h"
+
+using namespace WallpaperEngine::Data::Parsers;
+
+WallpaperUniquePtr WallpaperParser::parse (const JSON& file, Project& project) {
+    switch (project.type) {
+	case Project::Type_Scene:
+	    return parseScene (file, project);
+	case Project::Type_Video:
+	    return parseVideo (file, project);
+	case Project::Type_Web:
+	    return parseWeb (file, project);
+	default:
+	    sLog.exception ("Unexpected project type value found... This is likely a bug");
+    }
+}
+
+SceneUniquePtr WallpaperParser::parseScene (const JSON& file, Project& project) {
+    const auto scene = WallpaperEngine::Data::JSON::parseLenient (project.assetLocator->readString (file));
+    const auto camera = scene.require ("camera", "Scenes must have a camera section");
+    const auto general = scene.require ("general", "Scenes must have a general section");
+    const auto projection
+	= general.require ("orthogonalprojection", "General section must have orthogonal projection info");
+    const bool isPerspectiveScene = projection.is_null ();
+    const auto objects = scene.require ("objects", "Scenes must have an objects section");
+    const auto& properties = project.properties;
+
+    // TODO: FIND IF THESE DEFAULTS ARE SENSIBLE OR NOT AND PERFORM PROPER VALIDATION WHEN CAMERA PREVIEW AND CAMERA
+    // PARALLAX ARE PRESENT
+
+    return std::make_unique <Scene> (
+        WallpaperData {
+            .filename = "",
+            .project = project
+        }, SceneData {
+            .colors = {
+                .ambient  = general.user ("ambientcolor", properties, glm::vec3 (0.3f)),
+                .skylight = general.user ("skylightcolor", properties, glm::vec3 (0.3f)),
+                .clear = general.user ("clearcolor", properties, glm::vec3 (1.0f)),
+            },
+            .fog = {
+                .distance = {
+                    .enabled = general.user ("fogdistance", properties, false),
+                    .color = general.user ("fogdistancecolor", properties, glm::vec3 (0.0f)),
+                    .start = general.user ("fogdistancestart", properties, 0.0f),
+                    .end = general.user ("fogdistanceend", properties, 1.0f),
+                    .startDensity = general.user ("fogdistancestartdensity", properties, 0.0f),
+                    .endDensity = general.user ("fogdistanceenddensity", properties, 1.0f),
+                },
+                .height = {
+                    .enabled = general.user ("fogheight", properties, false),
+                    .color = general.user ("fogheightcolor", properties, glm::vec3 (0.0f)),
+                    .start = general.user ("fogheightstart", properties, 0.0f),
+                    .end = general.user ("fogheightend", properties, 1.0f),
+                    .startDensity = general.user ("fogheightstartdensity", properties, 0.0f),
+                    .endDensity = general.user ("fogheightenddensity", properties, 1.0f),
+                },
+            },
+            .camera = {
+                .fade = general.user ("camerafade", properties, false),
+                .preview = general.optional ("camerapreview", false),
+                .bloom = {
+                    .enabled = general.user ("bloom", properties, false),
+                    .strength = general.user ("bloomstrength", properties, 0.0f),
+                    .threshold = general.user ("bloomthreshold", properties, 0.0f),
+                    .tint = general.user ("bloomtint", properties, glm::vec3 (1.0f)),
+                    .hdr = general.optional ("hdr", false),
+                    .hdrIterations = general.optional ("bloomhdriterations", 8),
+                    .hdrScatter = general.optional ("bloomhdrscatter", 1.619f),
+                    .hdrFeather = general.optional ("bloomhdrfeather", 0.1f),
+                    .hdrStrength = general.user ("bloomhdrstrength", properties, 2.0f),
+                    .hdrThreshold = general.optional ("bloomhdrthreshold", 1.0f),
+                },
+                .parallax = {
+                    .enabled = general.user ("cameraparallax", properties, false),
+                    .amount = general.user ("cameraparallaxamount", properties, 1.0f),
+                    .delay = general.user ("cameraparallaxdelay", properties, 0.0f),
+                    .mouseInfluence = general.user ("cameraparallaxmouseinfluence", properties, 1.0f),
+                },
+                .shake = {
+                    .enabled = general.user ("camerashake", properties, false),
+                    .amplitude = general.user ("camerashakeamplitude", properties, 0.0f),
+                    .roughness = general.user ("camerashakeroughness", properties, 0.0f),
+                    .speed = general.user ("camerashakespeed", properties, 0.0f),
+                },
+                .configuration = {
+                    .center = camera.require <glm::vec3> ("center", "Camera must have a center position"),
+                    .eye = camera.require <glm::vec3> ("eye", "Camera must have an eye position"),
+                    .up = camera.require <glm::vec3> ("up", "Camera must have an up position"),
+                },
+                .projection = {
+                    .width  = isPerspectiveScene || projection.optional ("auto", false)
+                        ? 0 : projection.require <int> ("width",  "Projection must have a width"),
+                    .height = isPerspectiveScene || projection.optional ("auto", false)
+                        ? 0 : projection.require <int> ("height", "Projection must have a height"),
+                    .isAuto = !isPerspectiveScene && projection.optional ("auto", false),
+                    .isPerspective = isPerspectiveScene,
+                    .nearz = general.find ("nearz") != general.end () ? general.user ("nearz", properties, 0.0f)
+                                                                      : camera.user ("nearz", properties, 0.0f),
+                    .farz = general.find ("farz") != general.end () ? general.user ("farz", properties, 1000.0f)
+                                                                    : camera.user ("farz", properties, 1000.0f),
+                    .fov = general.find ("fov") != general.end () ? general.user ("fov", properties, 50.0f)
+                                                                  : camera.user ("fov", properties, 50.0f),
+                    .overrideFov = general.user ("perspectiveoverridefov", properties, 0.0f),
+                    .zoom = general.user ("zoom", properties, 1.0f)
+                }
+            },
+            .transparentSorting = general.optional ("transparentsorting", false),
+            .objects = parseObjects (objects, project),
+        }
+    );
+}
+
+VideoUniquePtr WallpaperParser::parseVideo (const JSON& file, Project& project) {
+    return std::make_unique<Video> (WallpaperData { .filename = file, .project = project });
+}
+
+WebUniquePtr WallpaperParser::parseWeb (const JSON& file, Project& project) {
+    return std::make_unique<Web> (WallpaperData {
+	.filename = file,
+	.project = project,
+    });
+}
+
+ObjectList WallpaperParser::parseObjects (const JSON& objects, const Project& project) {
+    ObjectList result = {};
+
+    for (const auto& cur : objects) {
+	result.emplace_back (ObjectParser::parse (cur, project));
+    }
+
+    return result;
+}

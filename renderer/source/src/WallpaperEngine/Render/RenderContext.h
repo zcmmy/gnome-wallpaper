@@ -1,0 +1,72 @@
+#pragma once
+
+#include <glm/vec4.hpp>
+#include <memory>
+#include <vector>
+
+#include "TextureCache.h"
+#include "WallpaperEngine/Application/WallpaperApplication.h"
+#include "WallpaperEngine/Input/InputContext.h"
+#include "WallpaperEngine/Input/MouseInput.h"
+#include "WallpaperEngine/Render/Drivers/Output/Output.h"
+#include "WallpaperEngine/Render/Drivers/Output/OutputViewport.h"
+#include "WallpaperEngine/Render/Drivers/VideoDriver.h"
+
+namespace WallpaperEngine {
+namespace Application {
+    class WallpaperApplication;
+}
+namespace Media {
+    class MediaSource;
+}
+
+namespace Render {
+    namespace Drivers {
+	class VideoDriver;
+
+	namespace Output {
+	    class Output;
+	    class OutputViewport;
+	} // namespace Output
+    } // namespace Drivers
+
+    class CWallpaper;
+    class TextureCache;
+
+    class RenderContext {
+    public:
+	RenderContext (Drivers::VideoDriver& driver, WallpaperApplication& app, Media::MediaSource& mediaSource);
+
+	void render (Drivers::Output::OutputViewport* viewport);
+	[[nodiscard]] bool willRenderScene (const Drivers::Output::OutputViewport* viewport) const;
+	void setWallpaper (const std::string& display, std::shared_ptr<CWallpaper> wallpaper);
+	void clearWallpapers ();
+	/** drop sole-owner texture cache entries; see TextureCache::evictUnused. Needs a current GL context */
+	size_t evictUnusedTextures ();
+	void setPause (bool newState) const;
+	/** fan a playback-speed change to every wallpaper (mpv-backed ones consume it) */
+	void setPlaybackSpeed (float speed) const;
+	/** fan a live volume change (0..128) to every wallpaper (mpv-backed ones consume it) */
+	void setAudioVolume (int volume) const;
+	[[nodiscard]] Input::InputContext& getInputContext () const;
+	[[nodiscard]] const WallpaperApplication& getApp () const;
+	[[nodiscard]] const Drivers::VideoDriver& getDriver () const;
+	[[nodiscard]] const Drivers::Output::Output& getOutput () const;
+	[[nodiscard]] std::shared_ptr<const TextureProvider> resolveTexture (const std::string& name) const;
+	[[nodiscard]] const std::map<std::string, std::shared_ptr<CWallpaper>>& getWallpapers () const;
+	[[nodiscard]] Media::MediaSource& getMediaSource () const;
+
+    private:
+	/** Video driver in use */
+	Drivers::VideoDriver& m_driver;
+	/** Maps screen -> wallpaper list */
+	std::map<std::string, std::shared_ptr<CWallpaper>> m_wallpapers = {};
+	/** App that holds the render context */
+	WallpaperApplication& m_app;
+	/** Source for the media playback information */
+	Media::MediaSource& m_mediaSource;
+	/** Texture cache for the render */
+	std::unique_ptr<TextureCache> m_textureCache = nullptr;
+    };
+} // namespace Render
+} // namespace WallpaperEngine

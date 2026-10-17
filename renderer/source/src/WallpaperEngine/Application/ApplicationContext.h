@@ -1,0 +1,328 @@
+#pragma once
+
+#include <cstdint>
+#include <filesystem>
+#include <map>
+#include <optional>
+#include <string>
+#include <vector>
+
+#include <glm/vec4.hpp>
+
+#include "ApplicationState.h"
+#include "WallpaperEngine/Data/JSON.h"
+
+#include "../Render/TextureProvider.h"
+#include "WallpaperEngine/Render/WallpaperState.h"
+
+#include "WallpaperEngine/Data/Model/Project.h"
+
+namespace WallpaperEngine::Application {
+using namespace WallpaperEngine::Data::Assets;
+
+/**
+ * What the engine does while something else is fullscreen.
+ *
+ * LIVE-settable through the API's `set-fullscreen` verb and carried by every `show`
+ * as the resolved `fullscreen_behavior` arg, so a mode change takes effect on the
+ * running scene instead of at the next swap. `Off` is spelled Off rather than None
+ * because X11 #defines None.
+ */
+enum class FullscreenBehavior {
+    /** keep playing underneath the fullscreen window */
+    Off = 0,
+    /** freeze the scene, surfaces and VRAM retained, resume is instant */
+    Pause = 1,
+    /** tear the surfaces down and free the resources if the driver can (else pause); re-acquired when it clears */
+    Stop = 2,
+};
+
+/**
+ * Application information as parsed off the command line arguments
+ */
+class ApplicationContext {
+public:
+    ApplicationContext (int argc, char* argv[]);
+
+    /**
+     * Parses the given argc and argv and builds settings for the app
+     */
+    void loadSettingsFromArgv ();
+
+    enum WINDOW_MODE {
+	/** Default window mode */
+	NORMAL_WINDOW = 0,
+	/** Draw to the window server desktop */
+	DESKTOP_BACKGROUND = 1,
+	/** Explicit window mode with specified geometry */
+	EXPLICIT_WINDOW = 2,
+    };
+
+    /**
+     * Wayland-only: which wlr-layer-shell layer to anchor the wallpaper surface to.
+     * Different compositors treat layers differently; e.g. niri's
+     * `place-within-backdrop` layer-rule only applies to BACKGROUND surfaces.
+     */
+    enum WAYLAND_LAYER {
+	WAYLAND_LAYER_BACKGROUND = 0,
+	WAYLAND_LAYER_BOTTOM = 1,
+	WAYLAND_LAYER_TOP = 2,
+	WAYLAND_LAYER_OVERLAY = 3,
+    };
+
+    struct PlaylistSettings {
+	uint32_t delayMinutes = 60;
+	std::string mode = "timer";
+	std::string order = "sequential";
+	bool updateOnPause = false;
+	bool videoSequence = false;
+    };
+
+    struct PlaylistDefinition {
+	std::string name;
+	std::vector<std::filesystem::path> items;
+	PlaylistSettings settings;
+    };
+
+    struct SpanGroup {
+	std::vector<std::string> screens;
+	std::filesystem::path background;
+	WallpaperEngine::Render::WallpaperState::TextureUVsScaling scaling
+	    = WallpaperEngine::Render::WallpaperState::TextureUVsScaling::DefaultUVs;
+	TextureFlags clamp = TextureFlags_ClampUVs;
+    };
+
+    struct {
+	/**
+	 * General settings
+	 */
+	struct {
+	    /** If the user requested a list of properties for the given background */
+	    bool onlyListProperties;
+	    /** If the user requested a dump of the background structure */
+	    bool dumpStructure;
+	    bool apiSocket;
+	    bool daemonMode;
+	    /** If the user requested the particles to be deactivated */
+	    bool disableParticles;
+	    /** The path to the assets folder */
+	    std::filesystem::path assets;
+	    std::string propertiesFile;
+	    /** Background to load (provided as the final argument) as fallback for multi-screen setups */
+	    std::filesystem::path defaultBackground;
+	    /** The backgrounds specified for different screens */
+	    std::map<std::string, std::filesystem::path> screenBackgrounds;
+	    /** Properties to change values for */
+	    std::map<std::string, std::string> properties;
+	    /** The scaling mode for different screens */
+	    std::map<std::string, WallpaperEngine::Render::WallpaperState::TextureUVsScaling> screenScalings;
+	    /** The clamping mode for different screens */
+	    std::map<std::string, TextureFlags> screenClamps;
+	    /** Playlists selected per screen */
+	    std::map<std::string, PlaylistDefinition> screenPlaylists;
+	    /** Playlist used in window mode */
+	    std::optional<PlaylistDefinition> defaultPlaylist;
+	    /** Span groups: multiple monitors sharing one stretched wallpaper */
+	    std::vector<SpanGroup> spanGroups;
+	} general;
+
+	/**
+	 * Render settings
+	 */
+	struct {
+	    /** The mode to run the background in */
+	    WINDOW_MODE mode;
+	    /** Maximum FPS */
+	    int maximumFPS;
+	    /**
+	     * Indicates if pausing should happen when something goes fullscreen.
+	     * LAUNCH-scoped: without the command socket it decides whether a REAL
+	     * fullscreen detector is built (VideoFactories) and is what --no-fullscreen-pause writes. The running
+	     * policy lives in fullscreenBehavior below - read that, not this, when
+	     * deciding what to do on a fullscreen edge.
+	     */
+	    bool pauseOnFullscreen;
+	    FullscreenBehavior fullscreenBehavior;
+	    /**
+	     * Wayland-only: if true, only consider fullscreen toplevels that are also activated.
+	     * Useful for compositors with "virtual" fullscreen windows (e.g. scrollable tiling).
+	     */
+	    bool pauseOnFullscreenOnlyWhenActive;
+	    /**
+	     * Wayland-only: list of app_id substrings to ignore for fullscreen pause.
+	     * Example: "firefox" will match "org.mozilla.firefox".
+	     */
+	    std::vector<std::string> fullscreenPauseIgnoreAppIds;
+	    /** Render debugging switches for scene compatibility work */
+	    struct {
+		bool baseOnly;
+		bool noSolidFinal;
+		bool passLog;
+		std::optional<int> objectFilter;
+		std::vector<int> skipObjects;
+		std::vector<int> skipEffects;
+	    } debug;
+
+	    struct {
+		/** The window size used in explicit window */
+		glm::ivec4 geometry;
+		TextureFlags clamp;
+		WallpaperEngine::Render::WallpaperState::TextureUVsScaling scalingMode;
+	    } window;
+
+	    /** quality switches of the current show, read at scene load; empty = the launch flag, else environment */
+	    struct {
+		std::optional<float> ssfactor;
+		std::optional<float> clampComposites;
+		/** "" | "1" | "0" */
+		std::string texcomp;
+		/** "" | auto | full */
+		std::string texdetail;
+	    } quality;
+
+	    struct {
+		/** Which wlr-layer-shell layer to use for desktop backgrounds */
+		WAYLAND_LAYER layer;
+	    } wayland;
+	} render;
+
+	/**
+	 * Audio settings
+	 */
+	struct {
+	    /** If the audio system is enabled */
+	    bool enabled;
+	    /** Sound volume (0-128) */
+	    int volume;
+	    /** If the audio must be muted if something else is playing sound */
+	    bool automute;
+	    /** If audio processing can be enabled or not */
+	    bool audioprocessing;
+	} audio;
+
+	/**
+	 * Mouse input settings
+	 */
+	struct {
+	    /** If the mouse movement is enabled */
+	    bool enabled;
+	    /** If the mouse parallax should be disabled */
+	    bool disableparallax;
+	} mouse;
+
+	/**
+	 * Screenshot settings
+	 */
+	struct {
+	    /** If an screenshot should be taken */
+	    bool take;
+            /** Dedicated capture process: render scene coverage at 3840x2160. */
+            bool highQuality = false;
+	    /** The frames to wait until the screenshot is taken */
+	    uint32_t delay;
+	    /** The path to where the screenshot must be saved */
+	    std::filesystem::path path;
+	} screenshot;
+    } settings = {
+        .general = {
+            .onlyListProperties = false,
+            .dumpStructure = false,
+            .apiSocket = false,
+            .daemonMode = false,
+            .assets = "",
+            .defaultBackground = "",
+            .screenBackgrounds = {},
+            .properties = {},
+            .screenScalings = {},
+            .screenClamps = {},
+            .screenPlaylists = {},
+            .defaultPlaylist = std::nullopt,
+            .spanGroups = {},
+        },
+        .render = {
+            .mode = NORMAL_WINDOW,
+            .maximumFPS = 30,
+            .pauseOnFullscreen = true,
+            .fullscreenBehavior = FullscreenBehavior::Pause,
+            .pauseOnFullscreenOnlyWhenActive = false,
+            .fullscreenPauseIgnoreAppIds = {},
+            .debug = {
+                .baseOnly = false,
+                .noSolidFinal = false,
+	                .passLog = false,
+	                .objectFilter = std::nullopt,
+	                .skipObjects = {},
+	                .skipEffects = {},
+	            },
+            .window = {
+                .geometry = {},
+                .clamp = TextureFlags_ClampUVs,
+                .scalingMode = WallpaperEngine::Render::WallpaperState::TextureUVsScaling::DefaultUVs,
+            },
+            .wayland = {
+                .layer = WAYLAND_LAYER_BOTTOM,
+            },
+        },
+        .audio = {
+            .enabled = true,
+            .volume = 15,
+            .automute = true,
+            .audioprocessing = true,
+        },
+        .mouse = {
+            .enabled = true,
+            .disableparallax = false,
+        },
+        .screenshot = {
+            .take = false,
+            .delay = 5,
+            .path = "",
+        },
+    };
+
+    ApplicationState state;
+
+    [[nodiscard]] int getArgc () const;
+    [[nodiscard]] char** getArgv () const;
+
+private:
+    /** Program argument count on startup */
+    int m_argc;
+    /** Program arguments on startup */
+    char** m_argv;
+
+    /**
+     * Validates the assets folder and ensures a valid one is present
+     */
+    void validateAssets ();
+
+    /**
+     * Validates the screenshot settings
+     */
+    void validateScreenshot () const;
+
+    /**
+     * Validates a background parameter and returns the real bgIdOrPath to it
+     *
+     * @param bgIdOrPath
+     * @return
+     */
+    static std::filesystem::path translateBackground (const std::string& bgIdOrPath);
+
+    void loadPlaylistsFromConfig ();
+    std::filesystem::path resolvePlaylistItemPath (const std::string& raw) const;
+    std::filesystem::path configFilePath () const;
+    std::optional<WallpaperEngine::Data::JSON::JSON> parseConfigJson (const std::filesystem::path& path) const;
+    PlaylistSettings parsePlaylistSettings (const WallpaperEngine::Data::JSON::JSON& playlistJson) const;
+    std::vector<std::filesystem::path>
+    collectPlaylistItems (const WallpaperEngine::Data::JSON::JSON& playlistJson, const std::string& name) const;
+    std::optional<PlaylistDefinition> buildPlaylistDefinition (
+	const WallpaperEngine::Data::JSON::JSON& playlistJson, const std::string& fallbackName
+    ) const;
+    void registerPlaylist (PlaylistDefinition&& definition);
+    [[nodiscard]] const PlaylistDefinition& getPlaylistFromConfig (const std::string& name);
+
+    std::map<std::string, PlaylistDefinition> m_configPlaylists;
+    bool m_loadedConfigPlaylists = false;
+};
+} // namespace WallpaperEngine::Application

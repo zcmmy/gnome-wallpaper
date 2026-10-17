@@ -1,0 +1,49 @@
+{
+  "description": "Working changes at integration start; final v0 changes are tracked by the root repository. Generated schemas are excluded.",
+  "components": {
+    "renderer": [
+      " M src/WallpaperEngine/Api/CommandDispatcher.cpp",
+      " M src/WallpaperEngine/Application/ApplicationContext.cpp",
+      " M src/WallpaperEngine/Application/ApplicationContext.h",
+      " M src/WallpaperEngine/Application/HelpText.cpp",
+      " M src/WallpaperEngine/Application/WallpaperApplication.cpp",
+      " M src/WallpaperEngine/Audio/Drivers/Recorders/PulseAudioPlaybackRecorder.cpp",
+      " M src/WallpaperEngine/Data/Parsers/TextureParser.cpp",
+      " M src/WallpaperEngine/Input/Drivers/GLFWMouseInput.cpp",
+      " M src/WallpaperEngine/Input/Drivers/GLFWMouseInput.h",
+      " M src/WallpaperEngine/Input/InputContext.h",
+      " M src/WallpaperEngine/Input/MouseInput.h",
+      " M src/WallpaperEngine/Render/Drivers/GLFWOpenGLDriver.cpp",
+      " M src/WallpaperEngine/Render/Wallpapers/CScene.cpp",
+      " M src/WallpaperEngine/Render/Wallpapers/CScene.h",
+      "?? src/WallpaperEngine/Audio/SpectrumBands.h",
+      "?? src/WallpaperEngine/Input/PointerCoordinates.h",
+      "?? src/WallpaperEngine/Render/CaptureResampler.h"
+    ],
+    "gnome-extension": [
+      " M CLAUDE.md",
+      " M README.md",
+      " M docs/architecture.md",
+      " M docs/development.md",
+      " M extension.js",
+      " M prefs.js",
+      " M schemas/org.gnome.shell.extensions.wallpaperengine.gschema.xml",
+      " M scripts/install-fedora.sh",
+      "?? captureWorker.py",
+      "?? library.js",
+      "?? libraryOps.js",
+      "?? libraryWorker.py",
+      "?? manager.js",
+      "?? managerApp.js",
+      "?? managerUi.js",
+      "?? overviewWallpaper.js",
+      "?? pointerBridge.js",
+      "?? rendererClient.js",
+      "?? rotation.js",
+      "?? scripts/package.sh",
+      "?? staticOverview.js",
+      "?? staticWallpaper.js",
+      "?? wallpaperExtension.js"
+    ]
+  }
+}

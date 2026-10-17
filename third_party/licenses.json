@@ -1,0 +1,27 @@
+{
+  "renderer": "renderer/source/LICENSE",
+  "gnome_extension": null,
+  "bundled_external_license_files": [
+    "renderer/source/src/External/Catch2/LICENSE.txt",
+    "renderer/source/src/External/ISPCTextureCompressor/license.txt",
+    "renderer/source/src/External/MimeTypes/LICENSE",
+    "renderer/source/src/External/SPIRV-Cross-WallpaperEngine/LICENSE",
+    "renderer/source/src/External/SPIRV-Cross-WallpaperEngine/LICENSES/Apache-2.0.txt",
+    "renderer/source/src/External/SPIRV-Cross-WallpaperEngine/LICENSES/CC-BY-4.0.txt",
+    "renderer/source/src/External/SPIRV-Cross-WallpaperEngine/LICENSES/LicenseRef-KhronosFreeUse.txt",
+    "renderer/source/src/External/SPIRV-Cross-WallpaperEngine/LICENSES/MIT.txt",
+    "renderer/source/src/External/argparse/LICENSE",
+    "renderer/source/src/External/glslang-WallpaperEngine/LICENSE.txt",
+    "renderer/source/src/External/json/LICENSE.MIT",
+    "renderer/source/src/External/json/LICENSES/Apache-2.0.txt",
+    "renderer/source/src/External/json/LICENSES/BSD-3-Clause.txt",
+    "renderer/source/src/External/json/LICENSES/GPL-3.0-only.txt",
+    "renderer/source/src/External/json/LICENSES/MIT.txt",
+    "renderer/source/src/External/kissfft/COPYING",
+    "renderer/source/src/External/kissfft/LICENSES/BSD-3-Clause",
+    "renderer/source/src/External/kissfft/LICENSES/Unlicense",
+    "renderer/source/src/External/quickjs/LICENSE",
+    "renderer/source/src/External/stb/LICENSE",
+    "renderer/source/src/External/stb/data/herringbone/license.txt"
+  ]
+}

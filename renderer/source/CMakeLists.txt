@@ -1,0 +1,930 @@
+cmake_minimum_required(VERSION 3.12)
+project(linux-wallpaperengine)
+
+# prevent installing to /usr by default so we don't bork anything
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "/opt/${PROJECT_NAME}" CACHE PATH "..." FORCE)
+endif()
+
+set_property(GLOBAL PROPERTY OS_FOLDERS ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
+set(OpenGL_GL_PREFERENCE "LEGACY")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# puts the app in demomode, which records a 5 second webm video and quits
+if(NOT DEMOMODE)
+    set(DEMOMODE 0)
+endif()
+
+# if you're developing you might find this debug option useful for shader output, although RenderDoc is encouraged
+if(NOT ERRORONLY)
+    set(ERRORONLY 0)
+endif()
+
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/VERSION")
+    message(FATAL_ERROR "VERSION not found at ${CMAKE_SOURCE_DIR}/VERSION: its first line must be the version stamp")
+endif()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/VERSION")
+file(STRINGS "${CMAKE_SOURCE_DIR}/VERSION" LWE_VERSION LIMIT_COUNT 1)
+string(STRIP "${LWE_VERSION}" LWE_VERSION)
+if("${LWE_VERSION}" STREQUAL "")
+    message(FATAL_ERROR "The first line of ${CMAKE_SOURCE_DIR}/VERSION is empty: it must be the version stamp")
+endif()
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-narrowing")
+
+find_package(X11)
+find_package(OpenGL REQUIRED)
+find_package(GLEW REQUIRED)
+
+find_package(DBus REQUIRED)
+find_package(ZLIB REQUIRED)
+find_package(SDL2 REQUIRED)
+find_package(MPV REQUIRED)
+find_package(LZ4 REQUIRED)
+find_package(FFMPEG REQUIRED)
+find_package(PulseAudio REQUIRED)
+find_package(Freetype REQUIRED)
+
+set(ENABLE_OPT OFF)
+set(SPIRV_CROSS_FORCE_PIC ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+# vendored tool and test binaries share the output directory with the engine, so
+# every one of these has to be off or it ends up in the install payload
+set(KISSFFT_TEST OFF CACHE BOOL "" FORCE)
+set(KISSFFT_TOOLS OFF CACHE BOOL "" FORCE)
+# linked into the engine library, so the install has no separate kissfft file to carry
+set(KISSFFT_STATIC ON CACHE BOOL "" FORCE)
+set(SPIRV_CROSS_CLI OFF CACHE BOOL "" FORCE)
+set(SPIRV_CROSS_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
+set(GLSLANG_TESTS OFF CACHE BOOL "" FORCE)
+
+# Download CEF of specified version for current platform
+# Specify the CEF distribution version.
+set(CEF_VERSION "135.0.17+gcbc1c5b+chromium-135.0.7049.52")
+# CEF_DISTRIBUTION_TYPE default value should be different based on the type of build
+# debug builds should use standard versions
+# while release version can do with the minimal version
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(default_cef_dist "standard")
+else()
+    set(default_cef_dist "minimal")
+endif()
+
+set(CEF_DISTRIBUTION_TYPE "${default_cef_dist}" CACHE STRING "CEF distribution variant")
+set_property(CACHE CEF_DISTRIBUTION_TYPE PROPERTY STRINGS "minimal" "standard")
+# Determine the platform.
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+    if("${PROJECT_ARCH}" STREQUAL "arm64")
+        set(CEF_PLATFORM "macosarm64")
+        set(CEF_ARCH_DETECTION "${PROJECT_ARCH}")
+    elseif("${PROJECT_ARCH}" STREQUAL "x86_64")
+        set(CEF_PLATFORM "macosx64")
+        set(CEF_ARCH_DETECTION "${PROJECT_ARCH}")
+    elseif("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "arm64")
+        set(PROJECT_ARCH "arm64")
+        set(CEF_PLATFORM "macosarm64")
+        set(CEF_ARCH_DETECTION "${CMAKE_HOST_SYSTEM_PROCESSOR}")
+    else()
+        set(PROJECT_ARCH "x86_64")
+        set(CEF_PLATFORM "macosx64")
+        set(CEF_ARCH_DETECTION "Default for Darwin")
+    endif()
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+    if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "arm")
+        set(CEF_PLATFORM "linuxarm")
+        set(CEF_ARCH_DETECTION "${CMAKE_SYSTEM_PROCESSOR}")
+    elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "arm64")
+        set(PROJECT_ARCH "arm64")
+        set(CEF_PLATFORM "linuxarm64")
+        set(CEF_ARCH_DETECTION "${CMAKE_SYSTEM_PROCESSOR}")
+    elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
+        set(PROJECT_ARCH "arm64")
+        set(CEF_PLATFORM "linuxarm64")
+        set(CEF_ARCH_DETECTION "${CMAKE_SYSTEM_PROCESSOR}")
+    elseif(CMAKE_SIZEOF_VOID_P MATCHES 8)
+        set(CEF_PLATFORM "linux64")
+        set(CEF_ARCH_DETECTION "Based on void size ${CMAKE_SIZEOF_VOID_P} (${CMAKE_SYSTEM_PROCESSOR})")
+    else()
+        message(FATAL_ERROR "Linux x86 32-bit builds are discontinued.")
+    endif()
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    if("${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" STREQUAL "ARM64")
+        set(CEF_PLATFORM "windowsarm64")
+        set(CEF_ARCH_DETECTION "${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}")
+    elseif(CMAKE_SIZEOF_VOID_P MATCHES 8)
+        set(CEF_PLATFORM "windows64")
+        set(CEF_ARCH_DETECTION "Based on void size ${CMAKE_SIZEOF_VOID_P}")
+    else()
+        set(CEF_PLATFORM "windows32")
+        set(CEF_ARCH_DETECTION "Default for Windows")
+    endif()
+endif()
+
+if(CEF_DISTRIBUTION_TYPE AND NOT CEF_DISTRIBUTION_TYPE STREQUAL "standard")
+    set(CEF_PLATFORM "${CEF_PLATFORM}_${CEF_DISTRIBUTION_TYPE}")
+endif()
+message(STATUS "Using CEF for ${CMAKE_SYSTEM_NAME} - ${CEF_PLATFORM} (${CEF_ARCH_DETECTION})")
+include(DownloadCEF)
+DownloadCEF("${CEF_PLATFORM}" "${CEF_VERSION}" "${CMAKE_CURRENT_BINARY_DIR}/cef")
+
+# add cef's cmake files to the lookup so we can use those directly
+list(APPEND CMAKE_MODULE_PATH "${CEF_ROOT}/cmake")
+
+find_package(CEF REQUIRED)
+
+# remove some switches that forbid us from using things that are commonplace in our codebase
+list(REMOVE_ITEM CEF_CXX_COMPILER_FLAGS -fno-exceptions)
+list(REMOVE_ITEM CEF_CXX_COMPILER_FLAGS -fno-rtti)
+list(REMOVE_ITEM CEF_CXX_COMPILER_FLAGS -std=c++17)
+list(REMOVE_ITEM CEF_COMPILER_FLAGS -fvisibility=hidden)
+list(REMOVE_ITEM CEF_COMPILER_FLAGS -fvisibility-inlines-hidden)
+list(APPEND CEF_CXX_COMPILER_FLAGS -std=c++20)
+list(APPEND CEF_EXE_LINKER_FLAGS -rdynamic)
+# remove the vulkan library from the files to copy so it doesn't fail after removing it
+list(REMOVE_ITEM CEF_BINARY_FILES libvulkan.so.1)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/output)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
+set(TARGET_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/output)
+
+# RPATH: $ORIGIN in the build tree and after install; a separate build RPATH gets an empty entry (the working directory)
+# NOTE: \$ORIGIN must be escaped because CMake treats $VAR as variable expansion.
+# IMPORTANT: This must be set BEFORE any add_executable()/add_library() calls in this directory.
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+set(CMAKE_INSTALL_RPATH "\$ORIGIN;\$ORIGIN/lib;\$ORIGIN/lib64")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+
+add_subdirectory(${CEF_LIBCEF_DLL_WRAPPER_PATH} libcef_dll_wrapper)
+add_subdirectory(src/External/glslang-WallpaperEngine glslang)
+add_subdirectory(src/External/SPIRV-Cross-WallpaperEngine spirv-cross)
+add_subdirectory(src/External/kissfft kissfft)
+add_subdirectory(src/External/argparse argparse)
+set(QJS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory(src/External/quickjs quickjs)
+# quickjs has no switch for its command line tools; only the library is used here
+foreach(qjs_tool qjs_exe qjsc run-test262 api-test function_source)
+    if(TARGET ${qjs_tool})
+        set_target_properties(${qjs_tool} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+    endif()
+endforeach()
+if(BUILD_TESTING)
+    add_subdirectory(src/External/Catch2)
+endif()
+# try to enable wayland builds when possible
+pkg_check_modules(WAYLAND_SUPPORT wayland-cursor wayland-protocols egl wayland-egl)
+
+if(WAYLAND_SUPPORT_FOUND)
+    find_program(WaylandScanner NAMES wayland-scanner)
+    message(STATUS "Found WaylandScanner at ${WaylandScanner}")
+    execute_process(
+        COMMAND pkg-config --variable=pkgdatadir wayland-protocols
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE WAYLAND_PROTOCOLS_DIR
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    message(STATUS "Found wayland-protocols at ${WAYLAND_PROTOCOLS_DIR}")
+    set(WAYLAND_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/wayland)
+
+    file(MAKE_DIRECTORY ${WAYLAND_OUTPUT_DIR})
+
+    message(STATUS "Building protocols...")
+    add_custom_command(OUTPUT ${WAYLAND_OUTPUT_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.h
+        COMMAND ${WaylandScanner} client-header ${CMAKE_CURRENT_SOURCE_DIR}/protocols/wlr-foreign-toplevel-management-unstable-v1.xml ${WAYLAND_OUTPUT_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.h)
+    add_custom_command(OUTPUT ${WAYLAND_OUTPUT_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
+        COMMAND ${WaylandScanner} private-code ${CMAKE_CURRENT_SOURCE_DIR}/protocols/wlr-foreign-toplevel-management-unstable-v1.xml ${WAYLAND_OUTPUT_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c)
+    add_custom_command(OUTPUT ${WAYLAND_OUTPUT_DIR}/wlr-layer-shell-unstable-v1-protocol.h
+        COMMAND ${WaylandScanner} client-header ${CMAKE_CURRENT_SOURCE_DIR}/protocols/wlr-layer-shell-unstable-v1.xml ${WAYLAND_OUTPUT_DIR}/wlr-layer-shell-unstable-v1-protocol.h)
+    add_custom_command(OUTPUT ${WAYLAND_OUTPUT_DIR}/wlr-layer-shell-unstable-v1-protocol.c
+        COMMAND ${WaylandScanner} private-code ${CMAKE_CURRENT_SOURCE_DIR}/protocols/wlr-layer-shell-unstable-v1.xml ${WAYLAND_OUTPUT_DIR}/wlr-layer-shell-unstable-v1-protocol.c)
+    add_custom_command(OUTPUT ${WAYLAND_OUTPUT_DIR}/xdg-shell-protocol.h
+        COMMAND ${WaylandScanner} client-header ${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml ${WAYLAND_OUTPUT_DIR}/xdg-shell-protocol.h)
+    add_custom_command(OUTPUT ${WAYLAND_OUTPUT_DIR}/xdg-shell-protocol.c
+        COMMAND ${WaylandScanner} private-code ${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml ${WAYLAND_OUTPUT_DIR}/xdg-shell-protocol.c)
+    add_custom_command(OUTPUT ${WAYLAND_OUTPUT_DIR}/xdg-output-unstable-v1-protocol.h
+        COMMAND ${WaylandScanner} client-header ${WAYLAND_PROTOCOLS_DIR}/unstable/xdg-output/xdg-output-unstable-v1.xml ${WAYLAND_OUTPUT_DIR}/xdg-output-unstable-v1-protocol.h)
+    add_custom_command(OUTPUT ${WAYLAND_OUTPUT_DIR}/xdg-output-unstable-v1-protocol.c
+        COMMAND ${WaylandScanner} private-code ${WAYLAND_PROTOCOLS_DIR}/unstable/xdg-output/xdg-output-unstable-v1.xml ${WAYLAND_OUTPUT_DIR}/xdg-output-unstable-v1-protocol.c)
+
+    include_directories(${WAYLAND_SUPPORT_INCLUDE_DIRS})
+    include_directories(${WAYLAND_OUTPUT_DIR})
+    set(WAYLAND_LIBRARIES
+        pthread
+        wayland-cursor
+        wayland-client
+        wayland-egl
+        ${OPENGL_egl_LIBRARY})
+    set(WAYLAND_SOURCES
+        src/WallpaperEngine/Render/Drivers/WaylandOpenGLDriver.h
+        src/WallpaperEngine/Render/Drivers/WaylandOpenGLDriver.cpp
+        src/WallpaperEngine/Render/Drivers/Detectors/WaylandFullScreenDetector.cpp
+        src/WallpaperEngine/Render/Drivers/Detectors/WaylandFullScreenDetector.h
+        src/WallpaperEngine/Render/Drivers/Output/WaylandOutput.cpp
+        src/WallpaperEngine/Render/Drivers/Output/WaylandOutput.h
+        src/WallpaperEngine/Render/Drivers/Output/WaylandOutputViewport.cpp
+        src/WallpaperEngine/Render/Drivers/Output/WaylandOutputViewport.h
+        src/WallpaperEngine/Input/Drivers/WaylandMouseInput.cpp
+        src/WallpaperEngine/Input/Drivers/WaylandMouseInput.h
+        ${WAYLAND_OUTPUT_DIR}/xdg-shell-protocol.c
+        ${WAYLAND_OUTPUT_DIR}/xdg-shell-protocol.h
+        ${WAYLAND_OUTPUT_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
+        ${WAYLAND_OUTPUT_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.h
+        ${WAYLAND_OUTPUT_DIR}/wlr-layer-shell-unstable-v1-protocol.c
+        ${WAYLAND_OUTPUT_DIR}/wlr-layer-shell-unstable-v1-protocol.h
+        ${WAYLAND_OUTPUT_DIR}/xdg-output-unstable-v1-protocol.c
+        ${WAYLAND_OUTPUT_DIR}/xdg-output-unstable-v1-protocol.h)
+endif()
+
+if(X11_FOUND)
+    if(NOT X11_Xrandr_FOUND)
+        message(WARNING "X11 support disabled. Xrandr package is missing")
+        set(X11_SUPPORT_FOUND FALSE)
+    elseif(NOT X11_xf86vmode_FOUND)
+        message(WARNING "X11 support disabled. Xxf86vm package is missing")
+        set(X11_SUPPORT_FOUND FALSE)
+    else()
+        message("X11 support enabled")
+        set(X11_SUPPORT_FOUND TRUE)
+    endif()
+endif()
+
+if(X11_SUPPORT_FOUND)
+    include_directories(${X11_INCLUDE_DIR} ${XRANDR_INCLUDE_DIR})
+
+    set(X11_LIBRARIES
+        ${X11_LIBRARIES}
+        ${X11_Xrandr_LIB})
+    set(X11_SOURCES
+        src/WallpaperEngine/Render/Drivers/Output/X11Output.cpp
+        src/WallpaperEngine/Render/Drivers/Output/X11Output.h
+        src/WallpaperEngine/Render/Drivers/Detectors/X11FullScreenDetector.cpp
+        src/WallpaperEngine/Render/Drivers/Detectors/X11FullScreenDetector.h)
+    SET(X11_INCLUDES
+        ${X11_INCLUDE_DIR}
+        ${XRANDR_INCLUDE_DIR})
+    set(CMAKE_REQUIRED_LIBRARIES ${X11_LIBRARIES})
+endif()
+
+if(DEMOMODE)
+    set(DEMOMODE_SOURCES
+        src/recording.cpp
+        src/recording.h)
+    message(WARNING "Enabling demo mode will automatically record 5 seconds and stop the software. This is used internally to produce the video seen on the website as a sort of status report")
+endif()
+if(NOT WAYLAND_SUPPORT_FOUND AND NOT X11_SUPPORT_FOUND)
+    message(WARNING "No window server detected at build time. You will only be able to preview backgrounds")
+endif()
+
+add_library(ceflib SHARED IMPORTED)
+set_target_properties(ceflib
+        PROPERTIES IMPORTED_LOCATION ${TARGET_OUTPUT_DIRECTORY}/libcef.so)
+
+ADD_LOGICAL_TARGET(libcef_lib "${CEF_LIB_DEBUG}" "${CEF_LIB_RELEASE}")
+PRINT_CEF_CONFIG()
+
+# Embed scene-script builtins (builtins.js) into a generated header, so the JS can
+# live in its own file (lint/syntax-highlight friendly) instead of an inline literal.
+# Added to the global include_directories so both the library and the tests target
+# (which recompiles the common sources) can find the generated header.
+set(WPENGINE_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(WPENGINE_BUILTINS_JS "${CMAKE_CURRENT_SOURCE_DIR}/src/WallpaperEngine/Scripting/resources/builtins.js")
+file(READ "${WPENGINE_BUILTINS_JS}" WPENGINE_SCRIPT_BUILTINS)
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/WallpaperEngine/Scripting/resources/Builtins.generated.h.in"
+    "${WPENGINE_GENERATED_DIR}/WallpaperEngine/Scripting/Builtins.generated.h"
+    @ONLY)
+# re-run configuration (regenerating the header) whenever the .js changes
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${WPENGINE_BUILTINS_JS}")
+
+include_directories(
+    ${WPENGINE_GENERATED_DIR}
+    src
+    src/External/glslang-WallpaperEngine
+    src/External/SPIRV-Cross-WallpaperEngine
+    src/External/MimeTypes
+    src/External/json/include
+    src/External/stb
+    src/External/kissfft
+    ${MPV_INCLUDE_DIR}
+    ${GLEW_INCLUDE_DIR}
+    ${LZ4_INCLUDE_DIR}
+    ${SDL2_INCLUDE_DIRS}
+    ${FFMPEG_INCLUDE_DIR}
+    ${PULSEAUDIO_INCLUDE_DIR}
+    ${CEF_INCLUDE_PATH}
+    ${CMAKE_SOURCE_DIR}
+    ${X11_INCLUDES}
+    ${DBUS_INCLUDE_DIRS})
+
+set(COMMON_SOURCES
+    src/External/MimeTypes/MimeTypes.cpp
+    src/External/MimeTypes/MimeTypes.h
+
+    src/Steam/FileSystem/FileSystem.cpp
+    src/Steam/FileSystem/FileSystem.h
+
+    src/WallpaperEngine/Logging/InstrumentRegistry.cpp
+    src/WallpaperEngine/Logging/InstrumentRegistry.h
+    src/WallpaperEngine/Logging/Log.cpp
+    src/WallpaperEngine/Logging/Log.h
+
+    src/WallpaperEngine/Debugging/CallStack.cpp
+    src/WallpaperEngine/Debugging/CallStack.h
+
+    src/WallpaperEngine/Api/CommandClient.cpp
+    src/WallpaperEngine/Api/CommandClient.h
+    src/WallpaperEngine/Api/CommandDispatcher.cpp
+    src/WallpaperEngine/Api/Lane.cpp
+    src/WallpaperEngine/Api/CommandDispatcher.h
+    src/WallpaperEngine/Api/CommandServer.cpp
+    src/WallpaperEngine/Api/CommandServer.h
+
+    src/WallpaperEngine/Application/ApplicationContext.cpp
+    src/WallpaperEngine/Application/ApplicationContext.h
+    src/WallpaperEngine/Application/BootGuard.cpp
+    src/WallpaperEngine/Application/BootGuard.h
+    src/WallpaperEngine/Application/Config.cpp
+    src/WallpaperEngine/Application/DebugSwitches.cpp
+    src/WallpaperEngine/Application/DebugSwitches.h
+    src/WallpaperEngine/Application/FlagValues.cpp
+    src/WallpaperEngine/Application/FlagValues.h
+    src/WallpaperEngine/Application/FullscreenPolicy.cpp
+    src/WallpaperEngine/Application/FullscreenPolicy.h
+    src/WallpaperEngine/Application/HelpText.cpp
+    src/WallpaperEngine/Application/HelpText.h
+    src/WallpaperEngine/Application/LweCommand.cpp
+    src/WallpaperEngine/Application/LweCommand.h
+    src/WallpaperEngine/Application/PanelHandoff.cpp
+    src/WallpaperEngine/Application/PanelHandoff.h
+    src/WallpaperEngine/Application/WallpaperApplication.cpp
+    src/WallpaperEngine/Application/WallpaperApplication.h
+
+    src/WallpaperEngine/Assets/AssetLoadException.cpp
+    src/WallpaperEngine/Assets/AssetLoadException.h
+    src/WallpaperEngine/Assets/AssetLocator.cpp
+    src/WallpaperEngine/Assets/AssetLocator.h
+
+    src/WallpaperEngine/FileSystem/Container.h
+    src/WallpaperEngine/FileSystem/Container.cpp
+    src/WallpaperEngine/FileSystem/Adapters/Types.h
+    src/WallpaperEngine/FileSystem/Adapters/Directory.cpp
+    src/WallpaperEngine/FileSystem/Adapters/Directory.h
+    src/WallpaperEngine/FileSystem/Adapters/Package.cpp
+    src/WallpaperEngine/FileSystem/Adapters/Package.h
+    src/WallpaperEngine/FileSystem/Adapters/Virtual.cpp
+    src/WallpaperEngine/FileSystem/Adapters/Virtual.h
+    src/WallpaperEngine/FileSystem/Adapters/MediaCover.h
+    src/WallpaperEngine/FileSystem/Adapters/MediaCover.cpp
+
+    src/WallpaperEngine/Audio/Drivers/Recorders/PulseAudioPlaybackRecorder.cpp
+    src/WallpaperEngine/Audio/Drivers/Recorders/PulseAudioPlaybackRecorder.h
+    src/WallpaperEngine/Audio/Drivers/Recorders/PlaybackRecorder.cpp
+    src/WallpaperEngine/Audio/Drivers/Recorders/PlaybackRecorder.h
+
+    src/WallpaperEngine/Audio/Drivers/Detectors/PulseAudioPlayingDetector.cpp
+    src/WallpaperEngine/Audio/Drivers/Detectors/PulseAudioPlayingDetector.h
+    src/WallpaperEngine/Audio/Drivers/Detectors/AudioPlayingDetector.cpp
+    src/WallpaperEngine/Audio/Drivers/Detectors/AudioPlayingDetector.h
+
+    src/WallpaperEngine/Audio/Drivers/AudioDriver.cpp
+    src/WallpaperEngine/Audio/Drivers/AudioDriver.h
+    src/WallpaperEngine/Audio/Drivers/SDLAudioDriver.cpp
+    src/WallpaperEngine/Audio/Drivers/SDLAudioDriver.h
+    src/WallpaperEngine/Audio/Drivers/NullAudioDriver.cpp
+    src/WallpaperEngine/Audio/Drivers/NullAudioDriver.h
+    src/WallpaperEngine/Audio/AudioContext.cpp
+    src/WallpaperEngine/Audio/AudioContext.h
+    src/WallpaperEngine/Audio/AudioStream.cpp
+    src/WallpaperEngine/Audio/AudioStream.h
+
+    src/WallpaperEngine/Input/InputContext.cpp
+    src/WallpaperEngine/Input/InputContext.h
+    src/WallpaperEngine/Input/MouseInput.h
+    src/WallpaperEngine/Input/PointerMoveGate.cpp
+    src/WallpaperEngine/Input/PointerMoveGate.h
+    src/WallpaperEngine/Input/Drivers/GLFWMouseInput.cpp
+    src/WallpaperEngine/Input/Drivers/GLFWMouseInput.h
+
+    src/WallpaperEngine/Media/MediaSource.h
+    src/WallpaperEngine/Media/MediaSource.cpp
+    src/WallpaperEngine/Media/DBusMediaSource.h
+    src/WallpaperEngine/Media/DBusMediaSource.cpp
+
+    src/WallpaperEngine/Render/Shaders/Variables/ShaderVariable.h
+    src/WallpaperEngine/Render/Shaders/Variables/ShaderVariable.cpp
+    src/WallpaperEngine/Render/Shaders/Variables/ShaderVariableFloat.h
+    src/WallpaperEngine/Render/Shaders/Variables/ShaderVariableFloat.cpp
+    src/WallpaperEngine/Render/Shaders/Variables/ShaderVariableInteger.h
+    src/WallpaperEngine/Render/Shaders/Variables/ShaderVariableInteger.cpp
+    src/WallpaperEngine/Render/Shaders/Variables/ShaderVariableVector2.h
+    src/WallpaperEngine/Render/Shaders/Variables/ShaderVariableVector2.cpp
+    src/WallpaperEngine/Render/Shaders/Variables/ShaderVariableVector3.h
+    src/WallpaperEngine/Render/Shaders/Variables/ShaderVariableVector3.cpp
+    src/WallpaperEngine/Render/Shaders/Variables/ShaderVariableVector4.h
+    src/WallpaperEngine/Render/Shaders/Variables/ShaderVariableVector4.cpp
+
+    src/WallpaperEngine/Render/Shaders/Shader.h
+    src/WallpaperEngine/Render/Shaders/Shader.cpp
+    src/WallpaperEngine/Render/Shaders/ShaderUnit.cpp
+    src/WallpaperEngine/Render/Shaders/ShaderUnit.h
+    src/WallpaperEngine/Render/Shaders/GLSLContext.cpp
+    src/WallpaperEngine/Render/Shaders/GLSLContext.h
+
+    src/WallpaperEngine/Render/Helpers/ContextAware.cpp
+    src/WallpaperEngine/Render/Helpers/ContextAware.h
+
+    src/WallpaperEngine/Render/Drivers/VideoFactories.cpp
+    src/WallpaperEngine/Render/Drivers/VideoFactories.h
+
+    src/WallpaperEngine/Render/Drivers/Detectors/FullScreenDetector.cpp
+    src/WallpaperEngine/Render/Drivers/Detectors/FullScreenDetector.h
+
+    src/WallpaperEngine/Render/Drivers/Output/Output.cpp
+    src/WallpaperEngine/Render/Drivers/Output/Output.h
+    src/WallpaperEngine/Render/Drivers/Output/GLFWWindowOutput.cpp
+    src/WallpaperEngine/Render/Drivers/Output/GLFWWindowOutput.h
+    src/WallpaperEngine/Render/Drivers/Output/GLFWOutputViewport.cpp
+    src/WallpaperEngine/Render/Drivers/Output/GLFWOutputViewport.h
+    src/WallpaperEngine/Render/Drivers/Output/OutputViewport.cpp
+    src/WallpaperEngine/Render/Drivers/Output/OutputViewport.h
+    src/WallpaperEngine/Render/Drivers/GLFWOpenGLDriver.h
+    src/WallpaperEngine/Render/Drivers/GLFWOpenGLDriver.cpp
+    src/WallpaperEngine/Render/Drivers/VideoDriver.h
+    src/WallpaperEngine/Render/Drivers/VideoDriver.cpp
+    src/WallpaperEngine/Render/RenderContext.h
+    src/WallpaperEngine/Render/RenderContext.cpp
+    src/WallpaperEngine/Render/TextureCache.h
+    src/WallpaperEngine/Render/TextureCache.cpp
+    src/WallpaperEngine/Render/FBOProvider.cpp
+    src/WallpaperEngine/Render/FBOProvider.h
+
+    src/WallpaperEngine/Render/Helpers/ContextAware.cpp
+    src/WallpaperEngine/Render/Helpers/ContextAware.h
+
+    src/WallpaperEngine/Render/CWallpaper.h
+    src/WallpaperEngine/Render/CWallpaper.cpp
+    src/WallpaperEngine/Render/OverlayLabel.cpp
+    src/WallpaperEngine/Render/MipResidency.cpp
+
+    src/WallpaperEngine/Render/LoadQuality.cpp
+    src/WallpaperEngine/Render/WallpaperState.h
+    src/WallpaperEngine/Render/WallpaperState.cpp
+    src/WallpaperEngine/Render/Wallpapers/CScene.h
+    src/WallpaperEngine/Render/Wallpapers/CScene.cpp
+    src/WallpaperEngine/Render/Wallpapers/CVideo.h
+    src/WallpaperEngine/Render/Wallpapers/CVideo.cpp
+    src/WallpaperEngine/Render/Wallpapers/CWeb.h
+    src/WallpaperEngine/Render/Wallpapers/CWeb.cpp
+    src/WallpaperEngine/Render/Camera.h
+    src/WallpaperEngine/Render/Camera.cpp
+    src/WallpaperEngine/Render/CObject.h
+    src/WallpaperEngine/Render/CObject.cpp
+    src/WallpaperEngine/Render/CTexture.cpp
+    src/WallpaperEngine/Render/CTexture.h
+    src/WallpaperEngine/Render/AlbumTexture.h
+    src/WallpaperEngine/Render/AlbumTexture.cpp
+    src/WallpaperEngine/Render/TextureProvider.h
+
+    src/WallpaperEngine/Render/Objects/CRenderable.cpp
+    src/WallpaperEngine/Render/Objects/CRenderable.h
+    src/WallpaperEngine/Render/Objects/CImage.h
+    src/WallpaperEngine/Render/Objects/CImage.cpp
+    src/WallpaperEngine/Render/Objects/PuppetModel.h
+    src/WallpaperEngine/Render/Objects/PuppetModel.cpp
+    src/WallpaperEngine/Render/Objects/CModel.h
+    src/WallpaperEngine/Render/Objects/CLight.cpp
+    src/WallpaperEngine/Render/Objects/CModel.cpp
+    src/WallpaperEngine/Render/Objects/CSound.h
+    src/WallpaperEngine/Render/Objects/CSound.cpp
+    src/WallpaperEngine/Render/Objects/CParticle.h
+    src/WallpaperEngine/Render/Objects/CParticle.cpp
+    src/WallpaperEngine/Render/Utils/WorkPool.cpp
+    src/WallpaperEngine/Render/Objects/CText.h
+    src/WallpaperEngine/Render/Objects/CText.cpp
+
+    src/WallpaperEngine/Render/CFBO.h
+    src/WallpaperEngine/Render/CFBO.cpp
+    src/WallpaperEngine/Render/Objects/Effects/CPass.h
+    src/WallpaperEngine/Render/Objects/Effects/CPass.cpp
+
+    src/WallpaperEngine/WebHelper/Protocol.cpp
+    src/WallpaperEngine/WebHelper/Protocol.h
+    src/WallpaperEngine/WebHelper/FrameContract.cpp
+    src/WallpaperEngine/WebHelper/FrameContract.h
+    src/WallpaperEngine/WebHelper/SpawnConfig.cpp
+    src/WallpaperEngine/WebHelper/SpawnConfig.h
+    src/WallpaperEngine/WebHelper/SpawnGate.cpp
+    src/WallpaperEngine/WebHelper/SpawnGate.h
+    src/WallpaperEngine/WebHelper/MessageChannel.cpp
+    src/WallpaperEngine/WebHelper/MessageChannel.h
+    src/WallpaperEngine/WebHelper/HelperClient.cpp
+    src/WallpaperEngine/WebHelper/HelperClient.h
+    src/WallpaperEngine/WebHelper/PropertyClassifier.cpp
+    src/WallpaperEngine/WebHelper/PropertyClassifier.h
+
+    src/WallpaperEngine/Data/Assets/Types.h
+    src/WallpaperEngine/Data/Assets/Texture.h
+    src/WallpaperEngine/Data/Assets/Package.h
+    src/WallpaperEngine/Data/Model/Types.h
+    src/WallpaperEngine/Data/Model/Project.h
+    src/WallpaperEngine/Data/Model/Wallpaper.h
+    src/WallpaperEngine/Data/Model/Object.h
+    src/WallpaperEngine/Data/Model/Material.h
+    src/WallpaperEngine/Data/Model/Effect.h
+    src/WallpaperEngine/Data/Model/Model.h
+    src/WallpaperEngine/Data/Model/UserSetting.h
+    src/WallpaperEngine/Data/Model/DynamicValue.h
+    src/WallpaperEngine/Data/Model/DynamicValue.cpp
+    src/WallpaperEngine/Data/Model/Property.h
+    src/WallpaperEngine/Data/Utils/TypeCaster.h
+    src/WallpaperEngine/Data/Utils/BinaryReader.cpp
+    src/WallpaperEngine/Data/Utils/BinaryReader.h
+    src/WallpaperEngine/Data/Utils/MemoryStream.h
+    src/WallpaperEngine/Data/Utils/SFINAE.h
+    src/WallpaperEngine/Data/Parsers/DynamicValueParser.h
+    src/WallpaperEngine/Data/Model/AnimationTimeline.cpp
+    src/WallpaperEngine/Data/Parsers/DynamicValueParser.cpp
+    src/WallpaperEngine/Data/Parsers/EffectParser.cpp
+    src/WallpaperEngine/Data/Parsers/EffectParser.h
+    src/WallpaperEngine/Data/Parsers/ProjectParser.cpp
+    src/WallpaperEngine/Data/Parsers/ProjectParser.h
+    src/WallpaperEngine/Data/Parsers/WallpaperParser.cpp
+    src/WallpaperEngine/Data/Parsers/WallpaperParser.h
+    src/WallpaperEngine/Data/Parsers/UserSettingParser.cpp
+    src/WallpaperEngine/Data/Parsers/UserSettingParser.h
+    src/WallpaperEngine/Data/Parsers/ObjectParser.cpp
+    src/WallpaperEngine/Data/Parsers/ObjectParser.h
+    src/WallpaperEngine/Data/Parsers/MaterialParser.cpp
+    src/WallpaperEngine/Data/Parsers/MaterialParser.h
+    src/WallpaperEngine/Data/Parsers/ModelParser.cpp
+    src/WallpaperEngine/Data/Parsers/ModelParser.h
+    src/WallpaperEngine/Data/Parsers/ShaderConstantParser.cpp
+    src/WallpaperEngine/Data/Parsers/ShaderConstantParser.h
+    src/WallpaperEngine/Data/Parsers/PackageParser.cpp
+    src/WallpaperEngine/Data/Parsers/PackageParser.h
+    src/WallpaperEngine/Data/Parsers/PropertyParser.cpp
+    src/WallpaperEngine/Data/Parsers/PropertyParser.h
+    src/WallpaperEngine/Data/Parsers/TextureParser.cpp
+    src/WallpaperEngine/Data/Parsers/TextureParser.h
+    src/WallpaperEngine/Data/Builders/ColorBuilder.h
+    src/WallpaperEngine/Data/Builders/ColorBuilder.cpp
+    src/WallpaperEngine/Data/Builders/UserSettingBuilder.h
+    src/WallpaperEngine/Data/Builders/VectorBuilder.cpp
+    src/WallpaperEngine/Data/Builders/VectorBuilder.h
+    src/WallpaperEngine/Data/Dumpers/StringPrinter.cpp
+    src/WallpaperEngine/Data/Dumpers/StringPrinter.h
+    src/WallpaperEngine/Data/JSON.cpp
+
+    src/WallpaperEngine/VideoPlayback/MPV/GLPlayer.cpp
+    src/WallpaperEngine/VideoPlayback/MPV/GLPlayer.h
+    src/WallpaperEngine/VideoPlayback/MPV/MemoryStreamProtocol.cpp
+    src/WallpaperEngine/VideoPlayback/MPV/MemoryStreamProtocol.h
+
+    src/WallpaperEngine/Scripting/Adapters/ObjectAdapter.h
+    src/WallpaperEngine/Scripting/Adapters/ObjectAdapter.cpp
+    src/WallpaperEngine/Scripting/Adapters/VectorAdapter.h
+    src/WallpaperEngine/Scripting/Adapters/VectorAdapter.cpp
+    src/WallpaperEngine/Scripting/Adapters/ScriptableObjectAdapter.h
+    src/WallpaperEngine/Scripting/Adapters/ScriptableObjectAdapter.cpp
+
+    src/WallpaperEngine/Scripting/Modules/ColorModule.h
+    src/WallpaperEngine/Scripting/Modules/ColorModule.cpp
+    src/WallpaperEngine/Scripting/Modules/MathModule.h
+    src/WallpaperEngine/Scripting/Modules/MathModule.cpp
+    src/WallpaperEngine/Scripting/Modules/VectorModule.h
+    src/WallpaperEngine/Scripting/Modules/VectorModule.cpp
+    src/WallpaperEngine/Scripting/Modules/ScriptModule.h
+    src/WallpaperEngine/Scripting/Modules/ScriptModule.cpp
+
+    src/WallpaperEngine/Scripting/ConsoleObject.h
+    src/WallpaperEngine/Scripting/ConsoleObject.cpp
+    src/WallpaperEngine/Scripting/EngineObject.h
+    src/WallpaperEngine/Scripting/EngineObject.cpp
+    src/WallpaperEngine/Scripting/ScriptTimers.h
+    src/WallpaperEngine/Scripting/ScriptTimers.cpp
+    src/WallpaperEngine/Scripting/InputObject.h
+    src/WallpaperEngine/Scripting/InputObject.cpp
+    src/WallpaperEngine/Scripting/SceneObject.h
+    src/WallpaperEngine/Scripting/SceneObject.cpp
+    src/WallpaperEngine/Scripting/ScriptEngine.h
+    src/WallpaperEngine/Scripting/ScriptPropertiesObject.h
+    src/WallpaperEngine/Scripting/ScriptPropertiesObject.cpp
+    src/WallpaperEngine/Scripting/LocalStorageObject.h
+    src/WallpaperEngine/Scripting/LocalStorageObject.cpp
+    src/WallpaperEngine/Scripting/ScriptEngine.cpp
+    src/WallpaperEngine/Scripting/ScriptableObject.h
+    src/WallpaperEngine/Scripting/ScriptableObject.cpp
+
+    src/WallpaperEngine/Maths.h
+    src/WallpaperEngine/Maths.cpp)
+
+if(BUILD_TESTING)
+    add_executable(
+        tests
+
+        ${COMMON_SOURCES}
+
+        src/WallpaperEngine/Testing/Cases/Example.cpp
+        src/WallpaperEngine/Testing/Render/TestingOpenGLDriver.cpp
+        src/WallpaperEngine/Testing/Render/TestingOpenGLDriver.h
+        src/WallpaperEngine/Testing/Input/TestingMouseInput.cpp
+        src/WallpaperEngine/Testing/Input/TestingMouseInput.h
+        src/WallpaperEngine/Testing/Harnesses/RenderHarness.cpp
+        src/WallpaperEngine/Testing/Harnesses/RenderHarness.h
+        src/WallpaperEngine/Testing/Cases/MouseCoordinates.cpp
+        src/WallpaperEngine/Testing/Cases/PointerMoveGate.cpp
+        src/WallpaperEngine/Testing/Cases/WebHelperStartupCost.cpp
+        src/WallpaperEngine/Testing/Cases/PropertyParser.cpp
+        src/WallpaperEngine/Testing/Cases/CurlNoise.cpp
+        src/WallpaperEngine/Testing/Cases/CssHexColors.cpp
+        src/WallpaperEngine/Testing/Cases/BinaryParserHardening.cpp
+        src/WallpaperEngine/Testing/Cases/TextureComponentFlags.cpp
+        src/WallpaperEngine/Testing/Cases/InstrumentRegistry.cpp
+        src/WallpaperEngine/Testing/Cases/CommandSocket.cpp
+        src/WallpaperEngine/Testing/Cases/LaneState.cpp
+        src/WallpaperEngine/Testing/Cases/LaneHistory.cpp
+        src/WallpaperEngine/Testing/Cases/ClampOutput.cpp
+        src/WallpaperEngine/Testing/Cases/LoadQuality.cpp
+        src/WallpaperEngine/Testing/Cases/Config.cpp
+        src/WallpaperEngine/Testing/Cases/Version.cpp
+        src/WallpaperEngine/Testing/Cases/StatePaths.cpp
+        src/WallpaperEngine/Testing/Cases/MirrorOwner.cpp
+        src/WallpaperEngine/Testing/Cases/FitWindow.cpp
+        src/WallpaperEngine/Testing/Cases/Schedule.cpp
+        src/WallpaperEngine/Testing/Cases/CommandDispatcher.cpp
+        src/WallpaperEngine/Testing/Cases/FlagValues.cpp
+        src/WallpaperEngine/Testing/Cases/ArgvFlags.cpp
+        src/WallpaperEngine/Testing/Cases/DebugSwitches.cpp
+        src/WallpaperEngine/Testing/Cases/HelpText.cpp
+        src/WallpaperEngine/Testing/Cases/SocketListeners.cpp
+        src/WallpaperEngine/Testing/Cases/FullscreenPolicy.cpp
+        src/WallpaperEngine/Testing/Cases/LweCommand.cpp
+        src/WallpaperEngine/Testing/Cases/CommandClient.cpp
+        src/WallpaperEngine/Testing/Cases/PanelHandoff.cpp
+        src/WallpaperEngine/Testing/Cases/RunPath.cpp
+        src/WallpaperEngine/Testing/Cases/BootGuard.cpp
+        src/WallpaperEngine/Testing/Cases/WebAssetLocator.cpp
+        src/WallpaperEngine/Testing/Cases/WebLibraryScan.cpp
+        src/WallpaperEngine/Testing/Cases/RenderOrder.cpp
+        src/WallpaperEngine/Testing/Cases/ScriptTimers.cpp
+        src/WallpaperEngine/Testing/Cases/SceneWalks.cpp)
+endif()
+
+add_library(
+    linux-wallpaperengine-lib SHARED
+
+    ${COMMON_SOURCES}
+    ${WAYLAND_SOURCES}
+    ${X11_SOURCES}
+    ${DEMOMODE_SOURCES})
+
+target_link_libraries (linux-wallpaperengine-lib PUBLIC
+    ${OPENGL_LIBRARIES}
+    GLEW::GLEW
+    ${ZLIB_LIBRARIES}
+    ${LZ4_LIBRARY}
+    ${SDL2_LIBRARIES}
+    ${FFMPEG_LIBRARIES}
+    ${MPV_LIBRARY}
+    ${PULSEAUDIO_LIBRARY}
+    Freetype::Freetype
+    ${WAYLAND_LIBRARIES}
+    ${X11_LIBRARIES}
+    ${DBUS_LIBRARIES}
+    kissfft
+    glslang
+    spirv-cross-core
+    spirv-cross-glsl
+    glfw
+    argparse
+    qjs)
+
+if (BUILD_TESTING)
+    target_link_libraries (tests PRIVATE
+        Catch2::Catch2WithMain
+        ${OPENGL_LIBRARIES}
+        GLEW::GLEW
+        ${ZLIB_LIBRARIES}
+        ${LZ4_LIBRARY}
+        ${SDL2_LIBRARIES}
+        ${FFMPEG_LIBRARIES}
+        ${MPV_LIBRARY}
+        ${PULSEAUDIO_LIBRARY}
+        Freetype::Freetype
+        ${WAYLAND_LIBRARIES}
+        ${X11_LIBRARIES}
+        ${DBUS_LIBRARIES}
+        kissfft
+        glslang
+        spirv-cross-core
+        spirv-cross-glsl
+        glfw
+        argparse
+        qjs)
+endif()
+
+target_compile_definitions(linux-wallpaperengine-lib PUBLIC ERRORONLY=${ERRORONLY})
+target_compile_definitions(linux-wallpaperengine-lib PUBLIC DEMOMODE=${DEMOMODE})
+target_compile_definitions(linux-wallpaperengine-lib PUBLIC LWE_VERSION="${LWE_VERSION}")
+
+if (BUILD_TESTING)
+    # tests should give as much output as possible
+    target_compile_definitions(tests PRIVATE ERRORONLY=0)
+    target_compile_definitions(tests PRIVATE DEMOMODE=0)
+    target_compile_definitions(tests PRIVATE LWE_VERSION="${LWE_VERSION}")
+    target_compile_definitions(tests PRIVATE LWE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+endif()
+
+if(X11_SUPPORT_FOUND)
+    target_compile_definitions(linux-wallpaperengine-lib PUBLIC ENABLE_X11)
+
+    # make sure some of the X11 functions we'll use are available
+    check_function_exists(XSetIOErrorExitHandler HAVE_XSETIOERROREXITHANDLER)
+
+    if(HAVE_XSETIOERROREXITHANDLER)
+        target_compile_definitions(linux-wallpaperengine-lib PUBLIC HAVE_XSETIOERROREXITHANDLER=1)
+    endif()
+endif()
+
+if(WAYLAND_SUPPORT_FOUND)
+    target_compile_definitions(linux-wallpaperengine-lib PUBLIC ENABLE_WAYLAND)
+endif()
+
+if(WAYLAND_SUPPORT_FOUND AND NOT X11_SUPPORT_FOUND)
+    target_compile_definitions(linux-wallpaperengine-lib PUBLIC GLEW_EGL)
+endif()
+
+target_include_directories(linux-wallpaperengine-lib PUBLIC
+    src
+    src/External/glslang-WallpaperEngine
+    src/External/SPIRV-Cross-WallpaperEngine
+    src/External/MimeTypes
+    src/External/json/include
+    src/External/stb
+    src/External/kissfft
+    ${MPV_INCLUDE_DIR}
+    ${GLEW_INCLUDE_DIR}
+    ${LZ4_INCLUDE_DIR}
+    ${SDL2_INCLUDE_DIRS}
+    ${FFMPEG_INCLUDE_DIR}
+    ${PULSEAUDIO_INCLUDE_DIR}
+    ${CEF_INCLUDE_PATH}
+    ${CMAKE_SOURCE_DIR}
+    ${X11_INCLUDES}
+    ${WAYLAND_OUTPUT_DIR})
+
+COPY_FILES(linux-wallpaperengine-lib "${CEF_BINARY_FILES}" "${CEF_BINARY_DIR}" "${TARGET_OUTPUT_DIRECTORY}")
+COPY_FILES(linux-wallpaperengine-lib "${CEF_RESOURCE_FILES}" "${CEF_RESOURCE_DIR}" "${TARGET_OUTPUT_DIRECTORY}")
+# remove the vulkan lib as chromium includes a broken libvulkan.so.1 with it
+file(REMOVE "${CEF_BINARY_DIR}/libvulkan.so.1")
+set_target_properties(linux-wallpaperengine-lib PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY ${TARGET_OUTPUT_DIRECTORY})
+
+add_dependencies(linux-wallpaperengine-lib libcef_dll_wrapper glslang spirv-cross-core spirv-cross-glsl)
+# custom version of cef's SET_EXECUTABLE_TARGET_PROPERTIES that fixes C files being compiled with the wrong parameters
+REPLACED_SET_EXECUTABLE_TARGET_PROPERTIES(linux-wallpaperengine-lib)
+
+add_executable(linux-wallpaperengine
+    src/main.cpp)
+
+target_link_libraries (linux-wallpaperengine PUBLIC linux-wallpaperengine-lib)
+
+if (BUILD_TESTING)
+    # the help test runs the engine binary, so building the tests builds it first
+    add_dependencies (tests linux-wallpaperengine)
+endif()
+
+add_executable(lwe-web-helper
+    src/web-helper-main.cpp
+
+    src/WallpaperEngine/WebBrowser/CEF/SchemeName.h
+    src/WallpaperEngine/WebBrowser/CEF/SubprocessApp.cpp
+    src/WallpaperEngine/WebBrowser/CEF/SubprocessApp.h)
+
+target_include_directories(lwe-web-helper PRIVATE
+    src
+    ${CEF_INCLUDE_PATH})
+
+target_link_libraries (lwe-web-helper PUBLIC
+    libcef_lib
+    libcef_dll_wrapper)
+
+add_dependencies(lwe-web-helper libcef_dll_wrapper)
+REPLACED_SET_EXECUTABLE_TARGET_PROPERTIES(lwe-web-helper)
+
+install(TARGETS lwe-web-helper
+    RUNTIME DESTINATION . COMPONENT lwe
+)
+
+add_executable(lwe-web-service
+    src/web-service-main.cpp
+
+    src/WallpaperEngine/WebBrowser/CEF/RenderHandler.cpp
+    src/WallpaperEngine/WebBrowser/CEF/RenderHandler.h
+    src/WallpaperEngine/WebBrowser/CEF/BrowserClient.cpp
+    src/WallpaperEngine/WebBrowser/CEF/BrowserClient.h
+    src/WallpaperEngine/WebBrowser/CEF/BrowserApp.cpp
+    src/WallpaperEngine/WebBrowser/CEF/BrowserApp.h
+    src/WallpaperEngine/WebBrowser/CEF/SchemeLocator.h
+    src/WallpaperEngine/WebBrowser/CEF/SchemeName.h
+    src/WallpaperEngine/WebBrowser/CEF/SubprocessApp.cpp
+    src/WallpaperEngine/WebBrowser/CEF/SubprocessApp.h
+    src/WallpaperEngine/WebBrowser/CEF/WPSchemeHandlerFactory.cpp
+    src/WallpaperEngine/WebBrowser/CEF/WPSchemeHandlerFactory.h
+    src/WallpaperEngine/WebBrowser/CEF/WPSchemeHandler.cpp
+    src/WallpaperEngine/WebBrowser/CEF/WPSchemeHandler.h
+    src/WallpaperEngine/WebBrowser/WebBrowserContext.cpp
+    src/WallpaperEngine/WebBrowser/WebBrowserContext.h
+
+    src/WallpaperEngine/WebHelper/Service/HelperServer.cpp
+    src/WallpaperEngine/WebHelper/Service/HelperServer.h
+    src/WallpaperEngine/WebHelper/Service/NullMediaSource.cpp
+    src/WallpaperEngine/WebHelper/Service/NullMediaSource.h
+    src/WallpaperEngine/WebHelper/Service/WebInstance.cpp
+    src/WallpaperEngine/WebHelper/Service/WebInstance.h)
+
+target_include_directories(lwe-web-service PRIVATE
+    src
+    src/External/MimeTypes
+    src/External/json/include
+    ${CEF_INCLUDE_PATH})
+
+target_link_libraries (lwe-web-service PUBLIC
+    linux-wallpaperengine-lib
+    libcef_lib
+    libcef_dll_wrapper)
+
+add_dependencies(lwe-web-service libcef_dll_wrapper)
+REPLACED_SET_EXECUTABLE_TARGET_PROPERTIES(lwe-web-service)
+
+install(TARGETS lwe-web-service
+    RUNTIME DESTINATION . COMPONENT lwe
+)
+
+if(BUILD_TESTING)
+    add_executable(lwe-web-frame-probe
+        tools/web-frame-probe.cpp)
+
+    target_include_directories(lwe-web-frame-probe PRIVATE
+        src
+        src/External/json/include)
+
+    target_link_libraries (lwe-web-frame-probe PUBLIC linux-wallpaperengine-lib)
+
+    REPLACED_SET_EXECUTABLE_TARGET_PROPERTIES(lwe-web-frame-probe)
+endif()
+
+# Install the main executable and shared library via install(TARGETS), which sets their
+# permissions; they already carry the install RPATH, so nothing is rewritten at install time.
+install(TARGETS linux-wallpaperengine
+    RUNTIME DESTINATION . COMPONENT lwe
+)
+install(TARGETS linux-wallpaperengine-lib
+    LIBRARY DESTINATION . COMPONENT lwe
+)
+
+# Install everything else from the output directory (CEF resources and the like).
+# The binaries are excluded because install(TARGETS) already placed them with their
+# permissions, and a directory copy would give them none.
+# Everything of ours is in component lwe; the vendored projects' own install rules
+# are skipped by installing only that component.
+install(DIRECTORY ${TARGET_OUTPUT_DIRECTORY}/ DESTINATION . COMPONENT lwe
+    PATTERN "linux-wallpaperengine" EXCLUDE
+    PATTERN "liblinux-wallpaperengine-lib.so" EXCLUDE
+    PATTERN "lwe-web-helper" EXCLUDE
+    PATTERN "lwe-web-service" EXCLUDE
+    PATTERN "lwe_bc7enc" EXCLUDE
+)
+
+# ---- lwe_bc7enc: the wizard's texture-compression shim (BC7/BC4/BC5) ----------------
+# Built only where ispc exists (x86-64); the installer treats a missing tool as fatal.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
+    find_program(ISPC_EXECUTABLE ispc)
+    if(ISPC_EXECUTABLE)
+        set(ISPC_TC_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/External/ISPCTextureCompressor/ispc_texcomp)
+        set(ISPC_TC_OUT ${CMAKE_CURRENT_BINARY_DIR}/ispc_texcomp)
+        file(MAKE_DIRECTORY ${ISPC_TC_OUT})
+        add_custom_command(
+            OUTPUT ${ISPC_TC_OUT}/kernel_ispc.o ${ISPC_TC_OUT}/kernel_ispc_sse2.o
+                   ${ISPC_TC_OUT}/kernel_ispc_avx.o ${ISPC_TC_OUT}/kernel_ispc.h
+            COMMAND ${ISPC_EXECUTABLE} -O2 --arch=x86-64 --target=sse2,avx --opt=fast-math --pic
+                    -o ${ISPC_TC_OUT}/kernel_ispc.o -h ${ISPC_TC_OUT}/kernel_ispc.h
+                    ${ISPC_TC_SRC}/kernel.ispc
+            DEPENDS ${ISPC_TC_SRC}/kernel.ispc
+            COMMENT "ispc: compressing kernels")
+        add_executable(lwe_bc7enc
+            tools/texcomp/lwe_bc7enc.cpp
+            ${ISPC_TC_SRC}/ispc_texcomp.cpp
+            ${ISPC_TC_OUT}/kernel_ispc.o
+            ${ISPC_TC_OUT}/kernel_ispc_sse2.o
+            ${ISPC_TC_OUT}/kernel_ispc_avx.o)
+        target_include_directories(lwe_bc7enc PRIVATE ${ISPC_TC_SRC} ${ISPC_TC_OUT})
+        target_compile_options(lwe_bc7enc PRIVATE -msse2 -O2)
+        set_target_properties(lwe_bc7enc PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/output)
+        install(TARGETS lwe_bc7enc
+            RUNTIME DESTINATION . COMPONENT lwe
+        )
+    endif()
+endif()

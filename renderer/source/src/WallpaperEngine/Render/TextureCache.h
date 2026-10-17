@@ -1,0 +1,59 @@
+#pragma once
+
+#include <functional>
+#include <map>
+#include <memory>
+#include <string>
+
+#include "TextureProvider.h"
+#include "WallpaperEngine/Render/Helpers/ContextAware.h"
+#include "WallpaperEngine/Render/RenderContext.h"
+
+using namespace WallpaperEngine::Render;
+
+namespace WallpaperEngine::Render {
+class AlbumTexture;
+namespace Helpers {
+    class ContextAware;
+}
+
+class RenderContext;
+
+class TextureCache final : Helpers::ContextAware {
+public:
+    explicit TextureCache (RenderContext& context);
+    ~TextureCache () override;
+
+    /**
+     * Checks if the given texture was already loaded and returns it
+     * If the texture was not loaded yet, it tries to load it from the container
+     *
+     * @param filename
+     * @return
+     */
+    std::shared_ptr<const TextureProvider> resolve (const std::string& filename);
+
+    /** cache key under the show's quality choices; names beginning with $ keep their plain name */
+    [[nodiscard]] static std::string cacheKey (const std::string& filename, bool texcomp, bool detailAuto);
+
+    /**
+     * Registers a texture in the cache
+     *
+     * @param name
+     * @param texture
+     */
+    void store (const std::string& name, std::shared_ptr<const TextureProvider> texture);
+
+    size_t evictUnused ();
+
+private:
+    /** The previous album thumbnail texture */
+    std::shared_ptr<const AlbumTexture> m_previousThumbnail = nullptr;
+    /** The current album thumbnail texture */
+    std::shared_ptr<const AlbumTexture> m_currentThumbnail = nullptr;
+    /** Cached textures */
+    std::map<std::string, std::shared_ptr<const TextureProvider>> m_textureCache = {};
+    /** The callback to de-register media events */
+    std::function<void ()> m_mediaCallback;
+};
+} // namespace WallpaperEngine::Render
