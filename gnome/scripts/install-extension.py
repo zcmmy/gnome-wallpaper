@@ -16,6 +16,10 @@ def install(source,destination):
         shutil.copy2(source/'libraryWorker.py',stage/'libraryWorker.py') if (source/'libraryWorker.py').exists() else None
         if (source/'captureWorker.py').exists():shutil.copy2(source/'captureWorker.py',stage/'captureWorker.py')
         shutil.copy2(source/'metadata.json',stage/'metadata.json')
+        for name in ['LICENSE','NOTICE.md']:
+            notice=source/name
+            if not notice.exists():notice=source.parents[1]/name
+            if notice.exists():shutil.copy2(notice,stage/name)
         for file in (source/'schemas').glob('*.gschema.xml'):shutil.copy2(file,stage/'schemas'/file.name)
         subprocess.run(['glib-compile-schemas','--strict',str(stage/'schemas')],check=True)
         if not (stage/'extension.js').exists() or not (stage/'schemas/gschemas.compiled').exists():raise ValueError('Incomplete extension')

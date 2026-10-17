@@ -6,7 +6,7 @@
 旧单壁纸 wallpaper/ 仍用于预览和历史测试，不能因为与图库重复就直接删除。
 构建：build/portghost 中包含可复用缓存及下载依赖；普通整理不清除此目录。
 兼容：sources/ 和 tools/ 仍被构建缓存或旧手动命令引用，保留。
-会话：runtime/live-extension、live-desktop、hq-live、static-overview-live 以及根下 config/cache/state 保留。
+会话：runtime/live-extension、live-desktop、hq-live、static-overview-live、runtime-capture-live 以及根下 config/cache/state 保留。
 报告与备份：保留原路径，便于历史聊天链接与回滚；不将报告目录视为缓存一并清除。
 
 ## 维护命令

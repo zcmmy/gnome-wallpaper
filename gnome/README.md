@@ -53,3 +53,5 @@ GUI 通过设置变化发出命令，不持有渲染器；关闭 GUI 不影响�
 --diagnostics DIR 保存过程日志和实际 FBO 尺寸；--quality standard --freeze 仅用于固定动画状态的对照测试。
 
 静态概览背景：staticOverview.js 仅在概览/应用列表可见且动态画面未就绪时，创建 GNOME BackgroundManager 原生背景层，复用当前原生壁纸与缓存。退出概览后销毁 actor 和对应背景管理器；不启动渲染器、截图任务、鼠标桥或轮询计时器。动态画面就绪时由原有动态概览层接管，禁用扩展时释放信号。integration/tests/check-static-overview.py 在隔离 GNOME 中结合当前 Blur my Shell、Dash to Dock 配置验证切换和清理，并生成应用列表截图。
+
+运行时手动截图由 `runtimeCapture.js` 管理；通过现有渲染器截图 IPC 获取当前帧，独立于缺图自动生成 worker。失败、换图或取消保留旧静态图；UI 明确确认后才允许覆盖。

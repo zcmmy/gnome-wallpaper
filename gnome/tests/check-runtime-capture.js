@@ -1,0 +1,46 @@
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import GdkPixbuf from 'gi://GdkPixbuf';
+import {WallpaperManager} from '../extension/manager.js';
+import {RuntimeCapture} from '../extension/runtimeCapture.js';
+const assert=(v,m)=>{if(!v)throw new Error(m);};
+const root=GLib.getenv('TEST_LIBRARY'),scene=root+'/live';GLib.mkdir_with_parents(scene,0o700);
+GLib.file_set_contents(scene+'/project.json',JSON.stringify({type:'scene',title:'Live'}));
+const png=(path,color)=>{const p=GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB,false,8,32,18);p.fill(color);p.savev(path,'png',[],[]);};
+const isBlue=()=>GdkPixbuf.Pixbuf.new_from_file(scene+'/static-background.png').get_pixels()[2]===255;
+png(scene+'/static-background.png',0xff0000ff);
+const settings=new Gio.Settings({schema_id:'org.gnome.shell.extensions.wallpaperengine'});
+settings.set_string('library-root',root);settings.set_string('selected-id','live');settings.set_boolean('enabled',true);settings.set_int('fps',15);
+const proc={get_identifier:()=> 'original-pid'};
+const ext={_settings:settings,_resolveScenePath:()=>scene,_proc:proc,_rendererReady:true,
+    _stopEngine:()=>{throw new Error('Capture restarted playback');}};
+const m=new WallpaperManager(ext);
+let requested;
+m.runtimeCapture=new RuntimeCapture(m,async(_socket,cmd,args)=>{assert(cmd==='screenshot','wrong command');requested=args.path;});
+const signal=settings.connect('changed',(_s,key)=>m.changed(key));
+const c=m.runtimeCapture;
+c.start('other','wrong');assert(c.result.state==='error'&&!c.job,'stale selection accepted');
+ext._rendererReady=false;c.start('live','loading');assert(!c.job,'loading capture accepted');ext._rendererReady=true;
+c.start('live','success');const first=c.job;assert(first,'capture not started: '+JSON.stringify(c.result));c.start('live','duplicate');assert(c.job===first,'duplicate replaced job');
+png(requested,0x0000ffff);c.complete(first);
+assert(isBlue()&&c.result.state==='done'&&!c.job,'still replacement failed');
+assert(ext._proc===proc&&settings.get_boolean('enabled')&&settings.get_int('fps')===15,'playback configuration changed');
+assert(Gio.File.new_for_path(scene+'/thumbnail.jpg').query_exists(null),'thumbnail missing');
+assert(new Gio.Settings({schema_id:'org.gnome.desktop.background'}).get_string('picture-uri').endsWith('/live/static-background.png'),'native background missing');
+assert(!Gio.File.new_for_path(first.directory).query_exists(null),'output directory leaked');
+c.start('live','changed');const changed=c.job;
+// Delete and recreate rather than relying on coarse timestamp resolution.
+Gio.File.new_for_path(scene+'/static-background.png').delete(null);png(scene+'/static-background.png',0xff0000ff);
+png(requested,0x0000ffff);c.complete(changed);
+assert(!isBlue()&&c.result.state==='error','concurrent user replacement lost');
+c.start('live','invalid');png(requested,0x0000ffff);GLib.file_set_contents(requested,'broken');c.complete(c.job);
+assert(!isBlue()&&c.result.state==='error','invalid PNG replaced still');
+c.start('live','stop');const stopped=c.job;settings.disconnect(signal);settings.set_boolean('enabled',false);png(requested,0x0000ffff);c.complete(stopped);
+assert(!isBlue()&&c.result.state==='cancelled'&&!c.job,'stop did not cancel');settings.set_boolean('enabled',true);
+c.start('live','user');const user=c.job;m.changed('static-revision');assert(!c.job&&!Gio.File.new_for_path(user.directory).query_exists(null),'image picker did not cancel');
+c.start('live','replace-proc');const old=c.job;ext._proc={get_identifier:()=> 'new-pid'};png(requested,0x0000ffff);c.complete(old);assert(c.result.state==='cancelled'&&!isBlue(),'old renderer still installed');ext._proc=proc;
+// Renderer rejects an unsupported command: preserve the old still and report failure.
+c.send=async()=>{throw new Error('unsupported');};c.start('live','unsupported');
+const loop=GLib.MainLoop.new(null,false);let failed=null;
+GLib.timeout_add(GLib.PRIORITY_DEFAULT,100,()=>{try{assert(c.result.state==='error'&&!c.job&&!isBlue(),'rejection lost old image');m.destroy();print('PASS: live capture replacement/thumbnail/native background, duplicate/stale guards, concurrent image, cancellation and unchanged playback');}catch(e){failed=e;}loop.quit();return GLib.SOURCE_REMOVE;});
+loop.run();if(failed)throw failed;

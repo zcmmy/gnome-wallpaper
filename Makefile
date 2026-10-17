@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 export DEST
 
-.PHONY: help build renderer extension check check-renderer check-gnome check-maintenance check-integration check-overview stage-manager stage-ui package inventory clean-tests clean-tests-apply
+.PHONY: help build renderer extension check check-renderer check-gnome check-maintenance check-integration check-overview check-runtime-capture stage-manager stage-ui package inventory clean-tests clean-tests-apply
 
 help:
 	@printf '%s\n' 'build / renderer / extension: build only; no installation' 'check: renderer, GNOME and cleanup safety checks' 'check-integration / check-overview: isolated graphical tests' 'stage-manager / stage-ui: prepare isolated test sessions' 'package DEST=/new/path: create an independent runtime' 'inventory: directory sizes and Git status' 'clean-tests: preview disposable test directories' 'clean-tests-apply: remove stopped test directories after safety checks'
@@ -23,6 +23,8 @@ check-integration:
 	bash integration/tests/check.sh --integration
 check-overview:
 	python3 integration/tests/check-static-overview.py
+check-runtime-capture:
+	python3 integration/tests/check-runtime-capture.py
 stage-manager:
 	python3 integration/tests/stage-manager-test.py
 stage-ui:

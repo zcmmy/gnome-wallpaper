@@ -5,6 +5,7 @@ import {readLibrary, scenePath, imageInfo, writeThumbnail} from './library.js';
 import {applyStaticWallpaper} from './staticWallpaper.js';
 import {advance} from './rotation.js';
 import {command} from './rendererClient.js';
+import {RuntimeCapture} from './runtimeCapture.js';
 const captureWorker = Gio.File.new_for_uri(import.meta.url).get_parent().get_child('captureWorker.py').get_path();
 
 export class WallpaperManager {
@@ -13,6 +14,7 @@ export class WallpaperManager {
         this.settings = extension._settings;
         this.timer = 0; this.capture = null; this.watchdog = 0; this.dead = false;
         this.error = ''; this.items = []; this.suspended = false;
+        this.runtimeCapture = new RuntimeCapture(this);
         this.reload();
         this.dbus = Gio.DBusExportedObject.wrapJSObject(`<node><interface name="org.wallpaper.Manager"><method name="Snapshot"><arg type="s" direction="out"/></method></interface></node>`, {Snapshot:() => this.settings.get_string('runtime-status')});
         this.dbus.export(Gio.DBus.session, '/org/gnome/Shell/WallpaperManager');
@@ -30,7 +32,7 @@ export class WallpaperManager {
         const status = {version:12, active:true, selected:this.settings.get_string('selected-id'),
             state:state ?? (e._procStopping ? 'stopping' : e._rendererReady ? 'dynamic' : e._proc ? 'loading' : this.error ? 'error' : 'static'),
             dynamic:this.settings.get_boolean('enabled'), pid:e._proc?.get_identifier() ?? null,
-            fps:this.settings.get_int('fps'), staticOverview:!!e._staticOverview, captureQuality:'4k-to-1080p', error:this.error, capturing:!!this.capture,
+            fps:this.settings.get_int('fps'), staticOverview:!!e._staticOverview, captureQuality:'4k-to-1080p', error:this.error, capturing:!!this.capture || !!this.runtimeCapture?.job, runtimeCaptureSupported:true, runtimeCapture:this.runtimeCapture?.result ?? null,
             staticReady:!!imageInfo(e._resolveScenePath() + '/static-background.png')};
         const value = JSON.stringify(status);
         if (this.settings.get_string('runtime-status') !== value) this.settings.set_string('runtime-status', value);
@@ -39,13 +41,19 @@ export class WallpaperManager {
         if (this.dead) return;
         if (['runtime-status','rotation-state','rotation-next-at'].includes(key)) return;
         if (key === 'manager-command') {
-            const cmd = this.settings.get_string(key).split(':')[0];
+            const value = this.settings.get_string(key);
+            if (value.startsWith('{')) {
+                try {const request=JSON.parse(value);if(request.action==='capture-static' && typeof request.id==='string' && typeof request.request==='string')this.runtimeCapture.start(request.id,request.request);}catch(_){}
+                return;
+            }
+            const cmd = value.split(':')[0];
             if (cmd === 'next' || cmd === 'previous') this.next(cmd === 'next' ? 1 : -1);
             if (cmd === 'retry') this.select();
             return;
         }
         if (key.startsWith('rotation-')) {this.arm(true); return;}
         if (key === 'static-revision') {
+            this.runtimeCapture.cancel();
             this.reload();
             try {applyStaticWallpaper(this.ext._resolveScenePath(), this.settings.get_string('scaling')); this.error = '';}
             catch (e) {this.error = e.message;}
@@ -84,7 +92,7 @@ export class WallpaperManager {
     select() {
         const e = this.ext;
         this.error = '';
-        this.cancelCapture(); this.clearWatchdog();
+        this.runtimeCapture.cancel(); this.cancelCapture(); this.clearWatchdog();
         if (e._restartTimeoutId) {GLib.source_remove(e._restartTimeoutId); e._restartTimeoutId = 0;}
         const root = this.settings.get_string('library-root');
         const scene = e._resolveScenePath();
@@ -118,10 +126,10 @@ export class WallpaperManager {
     }
     adopted() {this.clearWatchdog(); this.startCapture(this.ext._resolveScenePath()); this.publish();}
     clearWatchdog() {if (this.watchdog) GLib.source_remove(this.watchdog); this.watchdog = 0;}
-    failed(message) {this.clearWatchdog(); this.cancelCapture(); this.error = message; this.publish('error');}
+    failed(message) {this.clearWatchdog(); this.runtimeCapture.cancel(); this.cancelCapture(); this.error = message; this.publish('error');}
 
     startCapture(scene) {
-        if (this.dead || this.capture || !this.settings.get_boolean('enabled')) return;
+        if (this.dead || this.capture || this.runtimeCapture.job || !this.settings.get_boolean('enabled')) return;
         const path = this.prepareCapture(scene);
         if (!path) return;
         const capture = this.capture;
@@ -247,7 +255,7 @@ export class WallpaperManager {
         this.dead = true;
         this.dbus?.unexport();
         if (this.timer) GLib.source_remove(this.timer); this.timer = 0;
-        this.cancelCapture(); this.clearWatchdog();
+        this.runtimeCapture.cancel(); this.cancelCapture(); this.clearWatchdog();
         this.settings.set_string('runtime-status', JSON.stringify({version:12,active:false,state:'disabled'}));
     }
 }

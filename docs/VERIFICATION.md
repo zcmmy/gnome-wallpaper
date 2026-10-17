@@ -50,3 +50,11 @@ make check-gnome 会在临时目录生成纯色 PNG 和编译 schema，不需要
 make check-renderer 中视频纹理测试需要先 make renderer；优先使用 build/renderer，兼容旧 build/portghost。
 图形集成和截图对照保留了开发图库的 ID/场景约定，需要自备匹配素材，不能当作无素材 CI。
 check-static-overview 还需要本机装有 Blur my Shell 和 Dash to Dock；它们不是正式运行的强制依赖。
+
+## 当前帧截图测试
+
+- `make check`：命令路径校验、覆盖成功、原图并发修改保护、重复请求、取消及静态状态保护。
+- `python3 integration/tests/check-runtime-capture.py`：使用隔离副本中的场景和视频，验证真实截图、原生背景和缩略图更新；PID/FPS 不变、帧数继续增长。
+- 管理 UI 测试额外检查按钮仅在当前动态壁纸可用，以及取消确认不发送覆盖请求。
+
+集成结果保存在 `reports/runtime-capture/`。测试使用自备的韶华和星极素材，不改实际桌面或原始图库。

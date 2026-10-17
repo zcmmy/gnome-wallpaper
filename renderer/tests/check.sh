@@ -21,3 +21,7 @@ LD_LIBRARY_PATH="$renderer_output:${LD_LIBRARY_PATH:-}" "$test_dir/video-texture
 
 "${CXX:-g++}" -std=c++20 -O2 -Wall -Wextra -I"$source_dir" "$WALLPAPER_ROOT/renderer/tests/check-capture.cpp" -o "$test_dir/capture"
 "$test_dir/capture"
+
+"${CXX:-g++}" -std=c++20 -I"$source_dir" -I"$source_dir/External/json/single_include" \
+    "$WALLPAPER_ROOT/renderer/tests/check-capture-command.cpp" "$source_dir/WallpaperEngine/Api/CommandDispatcher.cpp" -o "$test_dir/capture-command"
+"$test_dir/capture-command"
