@@ -131,10 +131,10 @@ export function fillManagerWindow(window, settings) {
     }); detail.append(capture);
     let lastCaptureResult = null;
     try {lastCaptureResult=JSON.parse(settings.get_string('runtime-status')).runtimeCapture?.request ?? null;} catch (_) {}
-    const runtimeCapture = button('截图并替换静态图…', () => {
+    const runtimeCapture = button('高质量截图并替换静态图…', () => {
         const item=model.selected;
         if(!item || !model.connected)return;
-        const dialog=new Adw.AlertDialog({heading:'用当前动态画面替换静态图？',body:'将保存「'+item.title+'」正在播放的画面并覆盖其静态图片。动态播放继续，帧率不变。'});
+        const dialog=new Adw.AlertDialog({heading:'用高质量截图替换静态图？',body:'将为「'+item.title+'」另开一次高质量截图任务，成功后覆盖其静态图片。场景以 4K 渲染后缩小至 1080p；视频按原始画面采样。动态播放继续，帧率设置不变。截图时刻可能与桌面不同，任务期间会额外占用资源。'});
         dialog.add_response('cancel','取消');dialog.add_response('capture','截图并替换');
         dialog.set_close_response('cancel');dialog.set_response_appearance('capture',Adw.ResponseAppearance.DESTRUCTIVE);
         dialog.choose(window,null,(dlg,res)=>{
@@ -143,9 +143,9 @@ export function fillManagerWindow(window, settings) {
             settings.set_string('manager-command',JSON.stringify({action:'capture-static',id:item.id,request:GLib.uuid_string_random()}));
         });
     });
-    runtimeCapture.set_tooltip_text('保存播放中的当前帧；使用当前渲染分辨率，不另开渲染器。');detail.append(runtimeCapture);
+    runtimeCapture.set_tooltip_text('后台独立生成高质量静态图；播放继续，截图时刻可能不同。');detail.append(runtimeCapture);
     function updateCaptureAction(status) {
-        runtimeCapture.set_sensitive(model.connected && status.runtimeCaptureSupported===true && status.state==='dynamic' &&
+        runtimeCapture.set_sensitive(model.connected && status.runtimeCaptureSupported===true && status.runtimeCaptureQuality==='4k-to-1080p' && status.state==='dynamic' &&
             !status.capturing && !!model.selected?.supported && model.selected.id===settings.get_string('selected-id'));
     }
     const replace = button('选择静态图片…', () => {

@@ -293,8 +293,7 @@ private:
      *
      * @param filename
      */
-    void takeScreenshot (const std::filesystem::path& filename, std::shared_ptr<std::atomic_bool> busy = nullptr) const;
-    std::shared_ptr<std::atomic_bool> m_runtimeCaptureBusy = std::make_shared<std::atomic_bool>(false);
+    void takeScreenshot (const std::filesystem::path& filename) const;
 
     struct ActivePlaylist {
 	ApplicationContext::PlaylistDefinition definition;

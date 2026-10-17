@@ -8,7 +8,7 @@ using namespace WallpaperEngine::Api;
 using json = nlohmann::json;
 
 namespace {
-const std::set<std::string> KNOWN_VERBS = { "screenshot", "pointer", "status",
+const std::set<std::string> KNOWN_VERBS = { "pointer", "status",
 					    "show",
 					    "quit",
 					    "set-skip",
@@ -692,15 +692,6 @@ CommandDispatcher::ParseOutcome CommandDispatcher::parse (const std::string& lin
 	    return { .command = std::nullopt,
 		     .errorResponse = failure (id, "set-volume requires args.volume, an integer in 0..128") };
 	}
-    }
-
-    if (cmd == "screenshot") {
-        if (!args.contains("path") || !args["path"].is_string())
-            return {.errorResponse = failure(id, "screenshot requires an absolute PNG path")};
-        const auto path = args["path"].get<std::string>();
-        if (path.empty() || path[0] != '/' || path.size() > 4096 || path.find('\0') != std::string::npos
-            || !path.ends_with(".png"))
-            return {.errorResponse = failure(id, "screenshot requires an absolute PNG path")};
     }
 
     if (cmd == "pointer") {

@@ -802,7 +802,7 @@ void WallpaperApplication::ensureWebHelperClient () {
     this->m_webHelper = std::make_unique<WebHelper::HelperClient> (this->buildWebHelperSpawnConfig ());
 }
 
-void WallpaperApplication::takeScreenshot (const std::filesystem::path& filename, std::shared_ptr<std::atomic_bool> busy) const {
+void WallpaperApplication::takeScreenshot (const std::filesystem::path& filename) const {
     const int width = this->m_renderContext->getOutput ().getFullWidth ();
     const int height = this->m_renderContext->getOutput ().getFullHeight ();
     const bool vflip = this->m_renderContext->getOutput ().renderVFlip ();
@@ -882,14 +882,13 @@ void WallpaperApplication::takeScreenshot (const std::filesystem::path& filename
 	}
     }
 
-    if (busy && captures.empty()) throw std::runtime_error("No rendered frame available");
     const auto extension = filename.extension ();
     const std::string extStr = extension.string ();
 
     // Optional diagnostics preserve the exact input frame for offline A/B tests.
     const bool reference = std::getenv("LWE_SCREENSHOT_REFERENCE") != nullptr;
     // Only screenshots use this CPU filter, once in a worker; live rendering is unchanged.
-    std::thread ([captures = std::move(captures), width, height, vflip, extStr, filename, reference, busy] () {
+    std::thread ([captures = std::move(captures), width, height, vflip, extStr, filename, reference] () {
         try {
             std::vector<uint8_t> bitmap(Render::Capture::rgbSize(width, height), 0);
             nlohmann::json inputs = nlohmann::json::array();
@@ -918,20 +917,14 @@ void WallpaperApplication::takeScreenshot (const std::filesystem::path& filename
                 const nlohmann::json metadata={{"output",{width,height}},{"vflip",vflip},{"captures",inputs},{"filter","area-downscale/linear-upscale/pixel-center"}};
                 std::ofstream(filename.string()+".reference.json") << metadata.dump(2);
             }
-            // Live capture never exposes a partially encoded PNG to the manager.
-            const auto target = busy ? std::filesystem::path(filename.string()+".tmp") : filename;
             int saved=0;
-            if (extStr == ".bmp") saved=stbi_write_bmp(target.c_str(),width,height,3,bitmap.data());
-            else if (extStr == ".png") saved=stbi_write_png(target.c_str(),width,height,3,bitmap.data(),width*3);
-            else if (extStr == ".jpg" || extStr == ".jpeg") saved=stbi_write_jpg(target.c_str(),width,height,3,bitmap.data(),100);
+            if (extStr == ".bmp") saved=stbi_write_bmp(filename.c_str(),width,height,3,bitmap.data());
+            else if (extStr == ".png") saved=stbi_write_png(filename.c_str(),width,height,3,bitmap.data(),width*3);
+            else if (extStr == ".jpg" || extStr == ".jpeg") saved=stbi_write_jpg(filename.c_str(),width,height,3,bitmap.data(),100);
             if (!saved) sLog.error("Cannot save screenshot: ", filename.string());
-            if (busy && saved) std::filesystem::rename(target, filename);
-            if (busy && !saved) {std::error_code ec;std::filesystem::remove(target, ec);}
         } catch (const std::exception& error) {
             sLog.error("Screenshot processing failed: ", error.what());
-            if (busy) {std::error_code ec;std::filesystem::remove(filename.string()+".tmp", ec);}
         }
-        if (busy) busy->store(false);
     }).detach ();
 }
 
@@ -1426,27 +1419,6 @@ void WallpaperApplication::processApiRequests () {
 }
 
 void WallpaperApplication::handleApiCommand (int client, const Api::Command& command) {
-    if (command.cmd == "screenshot") {
-        if (!m_renderContext || !m_videoDriver || m_videoDriver->getFrameCounter() == 0 ||
-            m_renderContext->getWallpapers().empty()) {
-            m_commandServer->respond(client, Api::CommandDispatcher::failure(command.id, "No rendered frame available"));return;
-        }
-        if (m_runtimeCaptureBusy->exchange(true)) {
-            m_commandServer->respond(client, Api::CommandDispatcher::failure(command.id, "Screenshot already running"));return;
-        }
-        try {
-            const std::filesystem::path path(command.args["path"].get<std::string>());
-            if (!std::filesystem::is_directory(path.parent_path()) || std::filesystem::exists(path) ||
-                std::filesystem::exists(path.string()+".tmp")) throw std::runtime_error("Screenshot target must be a new PNG in an existing directory");
-            takeScreenshot(path, m_runtimeCaptureBusy);
-            m_commandServer->respond(client, Api::CommandDispatcher::done(command.id, {{"queued",true},{"path",path.string()}}));
-        } catch (const std::exception& error) {
-            m_runtimeCaptureBusy->store(false);
-            m_commandServer->respond(client, Api::CommandDispatcher::failure(command.id, error.what()));
-        }
-        return;
-    }
-
     if (command.cmd == "status") {
 	this->m_commandServer->respond (client, Api::CommandDispatcher::done (command.id, this->apiStatus ()));
 	return;
