@@ -491,11 +491,15 @@ bool CImage::loadPuppetMesh (const glm::vec2& size) {
 	glBindBuffer (GL_ARRAY_BUFFER, this->m_puppetTexCoord);
 	glBufferData (GL_ARRAY_BUFFER, texcoords.size () * sizeof (GLfloat), texcoords.data (), GL_STATIC_DRAW);
 
+	// uploadPuppetPositions reflects Y; reverse the triangle winding so
+	// materials using normal back-face culling keep their front faces.
+	auto indices = model.indices;
+	for (size_t i = 0; i + 2 < indices.size (); i += 3) {
+	    std::swap (indices[i + 1], indices[i + 2]);
+	}
 	glGenBuffers (1, &this->m_puppetIndices);
 	glBindBuffer (GL_ARRAY_BUFFER, this->m_puppetIndices);
-	glBufferData (
-	    GL_ARRAY_BUFFER, model.indices.size () * sizeof (GLushort), model.indices.data (), GL_STATIC_DRAW
-	);
+	glBufferData (GL_ARRAY_BUFFER, indices.size () * sizeof (GLushort), indices.data (), GL_STATIC_DRAW);
 
 	this->m_puppetIndexCount = static_cast<GLsizei> (model.indices.size ());
 

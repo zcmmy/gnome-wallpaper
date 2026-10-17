@@ -10,6 +10,7 @@
 
 #include "CScene.h"
 #include "WallpaperEngine/Logging/Log.h"
+#include "WallpaperEngine/Render/Objects/CGroup.h"
 
 #include "WallpaperEngine/Application/WallpaperApplication.h"
 #include "WallpaperEngine/Data/Model/Wallpaper.h"
@@ -1052,8 +1053,7 @@ Render::CObject* CScene::dispatchObjectType (const Object& object) {
 
 	renderObject = new Objects::CParticle (*this, particleData);
     } else {
-	sLog.error ("Unknown object type, creating placeholder, empty object: ", object.id);
-	renderObject = new CObject (*this, object);
+	renderObject = new Objects::CGroup (*this, object);
     }
 
     try {

@@ -86,14 +86,9 @@ CText::CText (Wallpapers::CScene& scene, const Text& text) :
     this->registerProperty ("visible", *text.visible->value);
     this->registerProperty ("pointSize", *text.pointSize->value);
     this->registerProperty ("text", *text.text->value);
-    this->registerProperty ("pointSize", *text.pointSize->value);
 }
 
 CText::~CText () {
-    if (m_layerHandle != Scripting::kInvalidLayerHandle) {
-	this->getScene ().getScriptEngine ().destroyLayer (m_layerHandle);
-	m_layerHandle = Scripting::kInvalidLayerHandle;
-    }
     if (m_vbo != 0) {
 	glDeleteBuffers (1, &m_vbo);
     }
@@ -115,13 +110,7 @@ CText::~CText () {
 }
 
 void CText::setup () {
-    const bool scripted = m_text.text->value->getScriptSource ().has_value ();
     const auto& text = m_text.text->value->getString ();
-
-    // Nothing to render and no script to produce text later -> bail.
-    if (text.empty () && !scripted) {
-	return;
-    }
 
     if (!initFreeType ()) {
 	return;
@@ -138,10 +127,6 @@ void CText::setup () {
     // Scripted text may have an empty placeholder; use a single space so the
     // glyph texture has non-zero dimensions until the script produces a value.
     rebuildTextureFrom (text.empty () ? std::string (" ") : text);
-
-    if (scripted) {
-	initScriptLayer ();
-    }
 
     m_valid = m_texture != 0 && m_program != 0 && m_vao != 0;
 }
@@ -211,21 +196,6 @@ unsigned int CText::computeEffectivePixelSize () const {
     return std::max<unsigned int> (1u, static_cast<unsigned int> (std::min (px, 512.0f)));
 }
 
-void CText::initScriptLayer () {
-    const auto& script = m_text.text->value->getScriptSource ();
-
-    if (!script.has_value ()) {
-	return;
-    }
-
-    m_layerHandle = this->getScene ().getScriptEngine ().createLayerScript (
-	*script, m_text.text->value->getProperties (), m_text.text->value->getString ()
-    );
-
-    if (m_layerHandle == Scripting::kInvalidLayerHandle) {
-	sLog.error ("CText: createLayerScript failed for '", m_text.name, "'");
-    }
-}
 
 namespace {
 uint32_t nextUtf8Codepoint (const std::string& text, size_t& offset) {
@@ -501,16 +471,10 @@ void CText::render () {
     std::string str = "Text " + this->getObject ().name + " (" + std::to_string (this->getObject ().id) + ")";
     glPushDebugGroup (GL_DEBUG_SOURCE_APPLICATION, 0, -1, str.c_str ());
 #endif /* DEBUG */
-    std::string renderedText = m_lastRenderedText;
-    if (m_layerHandle != Scripting::kInvalidLayerHandle) {
-	auto& se = this->getScene ().getScriptEngine ();
-	se.tickLayer (
-	    m_layerHandle, static_cast<double> (getScene ().getTime ()),
-	    static_cast<double> (getScene ().getDeltaTime ()), static_cast<double> (getScene ().getFps ())
-	);
-	const std::string current = se.layerText (m_layerHandle);
-	renderedText = current.empty () ? std::string (" ") : current;
-    }
+    // All property scripts run in the scene engine, including writes from other
+    // layers. Do not run a second private script or keep the setup-time string.
+    const auto &current = m_text.text->value->getString ();
+    const std::string renderedText = current.empty () ? " " : current;
 
     const unsigned int pixelSize = computeEffectivePixelSize ();
     if (pixelSize != m_lastPixelSize) {

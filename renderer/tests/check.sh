@@ -21,3 +21,9 @@ LD_LIBRARY_PATH="$renderer_output:${LD_LIBRARY_PATH:-}" "$test_dir/video-texture
 
 "${CXX:-g++}" -std=c++20 -O2 -Wall -Wextra -I"$source_dir" "$WALLPAPER_ROOT/renderer/tests/check-capture.cpp" -o "$test_dir/capture"
 "$test_dir/capture"
+
+"${CXX:-g++}" -std=c++20 -I"$source_dir" "$WALLPAPER_ROOT/renderer/tests/check-legacy-shaders.cpp" -o "$test_dir/legacy-shaders"
+"$test_dir/legacy-shaders"
+"${CXX:-g++}" -std=c++20 -I"$source_dir" "$WALLPAPER_ROOT/renderer/tests/check-puppet.cpp" \
+    -L"$renderer_output" -llinux-wallpaperengine-lib -o "$test_dir/puppet"
+LD_LIBRARY_PATH="$renderer_output:${LD_LIBRARY_PATH:-}" "$test_dir/puppet" ${PUPPET_TEST_MODEL:+"$PUPPET_TEST_MODEL"}

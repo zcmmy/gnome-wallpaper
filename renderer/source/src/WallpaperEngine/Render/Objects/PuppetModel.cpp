@@ -118,7 +118,10 @@ bool parseSkeleton (const std::vector<char>& data, PuppetModel& model) {
 	    return false;
 	}
 	const glm::mat4 bindLocal = readFileMatrix (cur);
-	cur.skip (2); // pad
+	// Two terminated strings: optional bone metadata and a name. Older
+	// files leave both empty; treating them as padding misaligns newer rigs.
+	cur.readCString ();
+	cur.readCString ();
 	if (!cur.ok) {
 	    model.bones.clear ();
 	    return false;
