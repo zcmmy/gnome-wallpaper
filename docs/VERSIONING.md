@@ -1,14 +1,19 @@
 # Git 与 v0
 
 统一仓库：git@github.com:zcmmy/gnome-wallpaper.git
-主分支：main；当前基线：VERSION 中的 v0 和同名附注标签。
+稳定分支：main；日常开发分支：dev。当前发布基线：VERSION 中的 v0 和同名附注标签。
+未发布功能先进入 dev，达到发布条件并完成审查后再合并到 main；普通功能提交不代表新版本发布。
 renderer/source、gnome/extension 均是顶层仓库中的普通源码目录，不是 gitlink/submodule。
 选择完整源码快照是为了让本地补丁可随一次 clone 获得，避免引用只有开发机才有的提交。
 不自动推送回上游项目，不依赖原始嵌套 .git。
 
 ## 常规开发
 
+日常修改在 dev 上进行；需要独立功能分支时，从 dev 创建。
+
 ```text
+git switch dev
+git pull --ff-only
 git switch -c feature/主题
 git status --short
 make check
@@ -18,7 +23,8 @@ git commit
 git push -u origin HEAD
 ```
 
-合并或发布时审查变更，更新 VERSION、[CHANGELOG.md](../CHANGELOG.md)，再创建新的附注标签。
+功能分支完成后先合并到 dev。准备发布时审查 dev 的完整变更，更新 VERSION、[CHANGELOG.md](../CHANGELOG.md)，
+再将确认发布的内容合并到 main 并创建新的附注标签。
 v0 是已发布基线，不重写或强制移动该标签；修正发布时创建新版本。
 无需为了普通项目修改而修改 third_party/sources.lock.json 中的上游 commit。
 
