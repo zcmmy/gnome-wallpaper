@@ -1,6 +1,7 @@
 // Exercise the actual ownership filter without running a compositor.
 const Gio = imports.gi.Gio;
 const callbacks=[];
+const holdCompositing=()=>{};
 const GLib={PRIORITY_DEFAULT:0, timeout_add:(_p,_ms,fn)=>{callbacks.push(fn);return callbacks.length;}};
 class Extension {}
 let manager;

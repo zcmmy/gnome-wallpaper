@@ -7,6 +7,7 @@ import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import Meta from 'gi://Meta';
 import Clutter from 'gi://Clutter';
+import {holdCompositing, releaseCompositing} from './compositingGuard.js';
 import {PointerBridge} from './pointerBridge.js';
 import {OverviewWallpaper} from './overviewWallpaper.js';
 import {StaticOverview} from './staticOverview.js';
@@ -22,7 +23,7 @@ const MPV_APP_ID = 'gwe-mpv-renderer';
 
 // Bumped on every code change; logged from enable() so we can tell which
 // revision the running shell actually loaded (see the comment there).
-const CODE_REVISION = 13;
+const CODE_REVISION = 14;
 
 const SIGTERM = 15;
 const SIGCONT = 18;
@@ -545,6 +546,10 @@ export default class WallpaperEngineExtension extends Extension {
 
         if (!this._windowMatchesRenderer(window)) return;
 
+        // Hold composition before the first buffer can map. On an empty
+        // workspace the wallpaper may otherwise become a direct scanout candidate.
+        holdCompositing(this);
+
         // Classify synchronously, before map/adoption polling. This also keeps
         // tilers enabled later from discovering the wallpaper as an application.
         this._waylandClient.make_desktop(window);
@@ -696,51 +701,55 @@ export default class WallpaperEngineExtension extends Extension {
     }
 
     _forgetWindow() {
-        if (this._rendererFirstFrameId && this._rendererActor) {
-            this._rendererActor.disconnect(this._rendererFirstFrameId);
-            this._rendererFirstFrameId = 0;
-        }
-        this._rendererReady = false;
-        this._overviewWallpaper?.clearSurface();
-        for (const id of this._rendererGeometryIds ?? []) {
-            try { this._rendererActor?.disconnect(id); } catch (_) { /* Actor disposed. */ }
-        }
-        this._rendererGeometryIds = [];
-        if (this._rendererWindow !== null) {
-            if (this._rendererUnmanagedId)
-                this._rendererWindow.disconnect(this._rendererUnmanagedId);
-            if (this._rendererRaisedId)
-                this._rendererWindow.disconnect(this._rendererRaisedId);
-            if (this._rendererFocusId)
-                this._rendererWindow.disconnect(this._rendererFocusId);
-
-        }
-        if (this._bgChildAddedId) {
-            Main.layoutManager._backgroundGroup.disconnect(this._bgChildAddedId);
-            this._bgChildAddedId = 0;
-        }
-        if (this._rendererVisibleId && this._rendererActor) {
-            try {
-                this._rendererActor.disconnect(this._rendererVisibleId);
-            } catch (_e) {
-                // Actor may already be disposed if this runs from 'unmanaged'.
+        try {
+            if (this._rendererFirstFrameId && this._rendererActor) {
+                this._rendererActor.disconnect(this._rendererFirstFrameId);
+                this._rendererFirstFrameId = 0;
             }
+            this._rendererReady = false;
+            this._overviewWallpaper?.clearSurface();
+            for (const id of this._rendererGeometryIds ?? []) {
+                try { this._rendererActor?.disconnect(id); } catch (_) { /* Actor disposed. */ }
+            }
+            this._rendererGeometryIds = [];
+            if (this._rendererWindow !== null) {
+                if (this._rendererUnmanagedId)
+                    this._rendererWindow.disconnect(this._rendererUnmanagedId);
+                if (this._rendererRaisedId)
+                    this._rendererWindow.disconnect(this._rendererRaisedId);
+                if (this._rendererFocusId)
+                    this._rendererWindow.disconnect(this._rendererFocusId);
+
+            }
+            if (this._bgChildAddedId) {
+                Main.layoutManager._backgroundGroup.disconnect(this._bgChildAddedId);
+                this._bgChildAddedId = 0;
+            }
+            if (this._rendererVisibleId && this._rendererActor) {
+                try {
+                    this._rendererActor.disconnect(this._rendererVisibleId);
+                } catch (_e) {
+                    // Actor may already be disposed if this runs from 'unmanaged'.
+                }
+            }
+            this._rendererVisibleId = 0;
+            this._rendererUnmanagedId = 0;
+            this._rendererRaisedId = 0;
+            this._rendererFocusId = 0;
+            this._rendererGeometryIds = [];
+            const actor = this._rendererActor;
+            const layer = this._rendererLayer;
+            if (actor && layer && actor.get_parent() === layer) {
+                layer.remove_child(actor);
+                global.window_group.add_child(actor);
+            }
+            layer?.destroy();
+            this._rendererLayer = null;
+            this._rendererWindow = null;
+            this._rendererActor = null;
+        } finally {
+            releaseCompositing(this);
         }
-        this._rendererVisibleId = 0;
-        this._rendererUnmanagedId = 0;
-        this._rendererRaisedId = 0;
-        this._rendererFocusId = 0;
-        this._rendererGeometryIds = [];
-        const actor = this._rendererActor;
-        const layer = this._rendererLayer;
-        if (actor && layer && actor.get_parent() === layer) {
-            layer.remove_child(actor);
-            global.window_group.add_child(actor);
-        }
-        layer?.destroy();
-        this._rendererLayer = null;
-        this._rendererWindow = null;
-        this._rendererActor = null;
     }
 
     _releaseWindow() {

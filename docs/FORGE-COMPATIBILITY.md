@@ -19,6 +19,8 @@ Forge 的 `lib/extension/window.js::trackWindow/_validWindow` 接受普通窗口
 2026-10-19，用户在真实桌面执行会话更新并开启动态模式后确认“应用窗口显示正常”。
 该修复已纳入 v0.0.1；修复分支 fix/forge-wallpaper-stacking 保留。
 
+空工作区遮蔽顶栏和 Dock 的后续问题见 [Shell 合成说明](EMPTY-WORKSPACE-COMPOSITING.md)。
+
 ## 修复
 
 - 渲染进程启动前，仅为当前 Forge 管理器包装 `_validWindow`。
