@@ -78,6 +78,21 @@ static JSValue scriptableobject_get_texture_animation (
     return controller;
 }
 
+static JSValue scriptableobject_get_parent (JSContext *ctx, JSValueConst, int, JSValueConst *, int, JSValue *data) {
+    JSClassID classId = 0;
+    auto *container = static_cast<OpaqueScriptableObjectAdapter *> (JS_GetAnyOpaque (data[0], &classId));
+    if (!container || container->magic != SCRIPTABLE_OPAQUE_MAGIC)
+	return JS_ThrowTypeError (ctx, "invalid layer");
+    const auto parentId = container->object.getObject ().parent;
+    if (!parentId)
+	return JS_UNDEFINED;
+    auto *parent = container->object.getScene ().getObject (*parentId);
+    auto *scriptable = dynamic_cast<const WallpaperEngine::Scripting::ScriptableObject *> (parent);
+    return scriptable ? container->adapter.instantiate (
+			    const_cast<WallpaperEngine::Scripting::ScriptableObject &> (*scriptable))
+		      : JS_UNDEFINED;
+}
+
 JSValue scriptableobject_property_get (JSContext* ctx, JSValueConst obj_val, JSAtom atom, JSValueConst receiver) {
     JSClassID classId = 0;
 
@@ -107,6 +122,16 @@ JSValue scriptableobject_property_get (JSContext* ctx, JSValueConst obj_val, JSA
 	return JS_UNDEFINED;
     }
 
+    if (strcmp (name, "name") == 0)
+	return JS_NewString (ctx, container->object.getObject ().name.c_str ());
+    if (strcmp (name, "id") == 0)
+	return JS_NewInt32 (ctx, container->object.getId ());
+
+    if (strcmp (name, "getParent") == 0) {
+	JSValue self = obj_val;
+	return JS_NewCFunctionData (ctx, scriptableobject_get_parent, 0, 0, 1, &self);
+    }
+
     if (strcmp (name, "getTextureAnimation") == 0) {
 	JSValue self = obj_val;
 	return JS_NewCFunctionData (ctx, scriptableobject_get_texture_animation, 0, 0, 1, &self);
@@ -126,21 +151,27 @@ int scriptableobject_property_set (
     JSContext* ctx, JSValueConst obj_val, JSAtom atom, JSValueConst val, JSValueConst receiver, int flags
 ) {
     JSClassID classId = 0;
-
-    auto* container = static_cast<OpaqueScriptableObjectAdapter*> (JS_GetAnyOpaque (obj_val, &classId));
-
+    auto *container = static_cast<OpaqueScriptableObjectAdapter *> (JS_GetAnyOpaque (obj_val, &classId));
     if (!container || container->magic != SCRIPTABLE_OPAQUE_MAGIC) {
 	JS_ThrowTypeError (ctx, "invalid object");
 	return -1;
     }
-
-    const char* name = JS_AtomToCString (ctx, atom);
-
-    if (name == nullptr) {
+    const char *name = JS_AtomToCString (ctx, atom);
+    if (!name)
 	return -1;
+    ScopeGuard guard ([=] { JS_FreeCString (ctx, name); });
+    const auto &properties = container->object.getProperties ();
+    if (const auto found = properties.find (name); found != properties.end ()) {
+	try {
+	    WallpaperEngine::Scripting::ScriptEngine::updateFromJs (ctx, val, found->second.value);
+	} catch (const std::exception &error) {
+	    JS_ThrowTypeError (ctx, "%s", error.what ());
+	    return -1;
+	}
+	return 1;
     }
-
-    return 0;
+    // Keep arbitrary script-owned fields ordinary JS properties.
+    return JS_DefinePropertyValue (ctx, receiver, atom, JS_DupValue (ctx, val), JS_PROP_C_W_E);
 }
 
 static void scriptableobject_finalizer (JSRuntime* rt, JSValueConst val) {
@@ -157,6 +188,7 @@ static void scriptableobject_finalizer (JSRuntime* rt, JSValueConst val) {
 ScriptableObjectAdapter::ScriptableObjectAdapter (ScriptEngine& engine, std::string name) :
     ObjectAdapter (engine), m_exoticMethods (), m_name (std::move (name)) {
     m_exoticMethods.get_property = scriptableobject_property_get;
+    m_exoticMethods.set_property = scriptableobject_property_set;
     this->registerType (
 	{
 	    .class_name = m_name.c_str (),
@@ -166,13 +198,29 @@ ScriptableObjectAdapter::ScriptableObjectAdapter (ScriptEngine& engine, std::str
     );
 }
 
+ScriptableObjectAdapter::~ScriptableObjectAdapter () {
+    for (const auto &[object, value] : m_instances)
+	JS_FreeValue (m_engine.getContext (), value);
+}
+
+void ScriptableObjectAdapter::forget (const ScriptableObject *object) {
+    const auto found = m_instances.find (object);
+    if (found != m_instances.end ()) {
+	JS_FreeValue (m_engine.getContext (), found->second);
+	m_instances.erase (found);
+    }
+}
+
 JSValue ScriptableObjectAdapter::instantiate (ScriptableObject& object) {
+    if (const auto found = m_instances.find (&object); found != m_instances.end ())
+	return JS_DupValue (m_engine.getContext (), found->second);
     JSValue result = this->ObjectAdapter::instantiate (object);
     JS_SetOpaque (
 	result,
 	new OpaqueScriptableObjectAdapter { .magic = SCRIPTABLE_OPAQUE_MAGIC, .adapter = *this, .object = object }
     );
 
+    m_instances.emplace (&object, JS_DupValue (m_engine.getContext (), result));
     return result;
 }
 

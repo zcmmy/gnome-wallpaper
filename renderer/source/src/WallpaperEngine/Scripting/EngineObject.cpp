@@ -20,6 +20,10 @@ JSValue engine_set_value (JSContext* ctx, JSValueConst this_val, int argc, JSVal
     return JS_ThrowTypeError (ctx, "property is read-only");
 }
 
+JSValue engine_is_running_in_editor (JSContext *ctx, JSValueConst, int, JSValueConst *) {
+    return JS_NewBool (ctx, false);
+}
+
 JSValue engine_open_user_shortcut (JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv) {
     return JS_UNDEFINED;
 }
@@ -248,6 +252,10 @@ EngineObject::EngineObject (ScriptEngine& engine, Render::Wallpapers::CScene& sc
 	JS_NewCFunction (this->m_engine.getContext (), engine_open_user_shortcut, "openUserShortcut", 0),
 	JS_PROP_ENUMERABLE
     );
+    JS_DefinePropertyValueStr (
+	this->m_engine.getContext (), this->m_instance, "isRunningInEditor",
+	JS_NewCFunction (this->m_engine.getContext (), engine_is_running_in_editor, "isRunningInEditor", 0),
+	JS_PROP_ENUMERABLE);
     // TODO: ADD THE REST OF THE DEFINITION!
 }
 
