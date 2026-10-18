@@ -16,6 +16,8 @@ GNOME Wayland 上的 Wallpaper Engine 场景/视频壁纸管理器。
 - 场景截图按 4K 可见区域渲染、缩小为 1080p；视频使用原生解码帧。
 - 静态/动态壁纸兼容桌面和应用列表背景；不改变顶栏、Dock 的尺寸或样式。
 
+Forge 平铺兼容性、原因与测试：[docs/FORGE-COMPATIBILITY.md](docs/FORGE-COMPATIBILITY.md)。
+
 ## 验证范围与限制
 
 当前本地验证平台为 Debian 13、GNOME 48、Wayland、x86_64。

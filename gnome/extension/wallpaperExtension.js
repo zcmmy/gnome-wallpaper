@@ -22,7 +22,7 @@ const MPV_APP_ID = 'gwe-mpv-renderer';
 
 // Bumped on every code change; logged from enable() so we can tell which
 // revision the running shell actually loaded (see the comment there).
-const CODE_REVISION = 12;
+const CODE_REVISION = 13;
 
 const SIGTERM = 15;
 const SIGCONT = 18;
@@ -126,6 +126,7 @@ export default class WallpaperEngineExtension extends Extension {
         this._overviewWallpaper?.destroy();
         this._overviewWallpaper = null;
         this._destroyed = true;
+        this._restoreTilingFilter();
         this._restartPending = false;
         this._stopPointerBridge();
 
@@ -349,6 +350,7 @@ export default class WallpaperEngineExtension extends Extension {
             this._installOverviewHiding(); this._embeddingActive = true;
         }
 
+        this._protectFromTiling();
         let proc;
         this._waylandClient = null;
         try {
@@ -507,11 +509,46 @@ export default class WallpaperEngineExtension extends Extension {
 
     // -------------------------------------------------------- window embedding
 
+    // Forge may receive window-created before us. Its bound signal handler
+    // calls _validWindow dynamically, so filter only our owned client before
+    // spawn. A floating-window rule is insufficient: Forge can keep floats above.
+    _protectFromTiling() {
+        const manager = Main.extensionManager.lookup('forge@jmmaranan.com')?.stateObj?.extWm;
+        if (manager && this._tilingFilter?.manager === manager) return;
+        this._restoreTilingFilter();
+        if (typeof manager?._validWindow !== 'function') return;
+        const extension = this;
+        const filter = {manager, original: manager._validWindow,
+            descriptor: Object.getOwnPropertyDescriptor(manager, '_validWindow'), active: true};
+        filter.wrapper = function (window, ...args) {
+            if (filter.active && extension._windowMatchesRenderer(window)) return false;
+            return filter.original.call(this, window, ...args);
+        };
+        manager._validWindow = filter.wrapper;
+        this._tilingFilter = filter;
+    }
+
+    _restoreTilingFilter() {
+        const filter = this._tilingFilter;
+        if (!filter) return;
+        filter.active = false;
+        if (filter.manager._validWindow === filter.wrapper) {
+            if (filter.descriptor) Object.defineProperty(filter.manager, '_validWindow', filter.descriptor);
+            else delete filter.manager._validWindow;
+        }
+        this._tilingFilter = null;
+    }
+
     _onWindowCreated(window) {
         if (this._proc === null || this._rendererWindow !== null || this._destroyed)
             return;
 
         if (!this._windowMatchesRenderer(window)) return;
+
+        // Classify synchronously, before map/adoption polling. This also keeps
+        // tilers enabled later from discovering the wallpaper as an application.
+        this._waylandClient.make_desktop(window);
+        this._waylandClient.hide_from_window_list(window);
 
         // wm_class / app-id and title may not be set at creation time on
         // Wayland; poll briefly before giving up on this window.
@@ -564,6 +601,7 @@ export default class WallpaperEngineExtension extends Extension {
 
         this._waylandClient.hide_from_window_list(window);
         window.stick();
+        if (window.is_above()) window.unmake_above();
         window.lower();
 
         const geo = this._targetGeometry();
