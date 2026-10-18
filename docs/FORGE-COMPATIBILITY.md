@@ -15,7 +15,9 @@ Forge 的 `lib/extension/window.js::trackWindow/_validWindow` 接受普通窗口
 
 隔离会话已复现 NORMAL、Forge tree 有对应节点、above=true 以及 Mutter 堆叠断言。
 仅在延迟接管时调用 make_desktop 仍留下 Forge 节点，不能解决创建事件顺序问题。
-隔离测试中应用最终仍可见，未稳定复现用户会话的持续遮挡；当前桌面需再人工验收。
+隔离测试中应用最终仍可见，未稳定复现用户会话的持续遮挡。
+2026-10-19，用户在真实桌面执行会话更新并开启动态模式后确认“应用窗口显示正常”。
+该修复已纳入 v0.0.1；修复分支 fix/forge-wallpaper-stacking 保留。
 
 ## 修复
 

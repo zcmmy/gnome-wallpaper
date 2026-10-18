@@ -1,6 +1,6 @@
 # 恢复壁纸的渲染兼容修复
 
-本次修改位于从 `dev` 创建的 `fix/wallpaper-rendering`，不作为发行版本，不合并到 `dev` 或 `main`。
+修复最初在从 `dev` 创建的 `fix/wallpaper-rendering` 上完成，现已纳入 `v0.0.1` 发布；原修复分支保留。
 
 ## 恢复范围
 

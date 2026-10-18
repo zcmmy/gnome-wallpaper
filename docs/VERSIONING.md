@@ -1,7 +1,7 @@
-# Git 与 v0
+# Git 与版本发布
 
 统一仓库：git@github.com:zcmmy/gnome-wallpaper.git
-稳定分支：main；日常开发分支：dev。当前发布基线：VERSION 中的 v0 和同名附注标签。
+稳定分支：main；日常开发分支：dev。当前发布基线：VERSION 中的 v0.0.1 和同名附注标签。
 未发布功能先进入 dev，达到发布条件并完成审查后再合并到 main；普通功能提交不代表新版本发布。
 renderer/source、gnome/extension 均是顶层仓库中的普通源码目录，不是 gitlink/submodule。
 选择完整源码快照是为了让本地补丁可随一次 clone 获得，避免引用只有开发机才有的提交。

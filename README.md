@@ -1,4 +1,4 @@
-# GNOME Wallpaper — v0
+# GNOME Wallpaper — v0.0.1
 
 GNOME Wayland 上的 Wallpaper Engine 场景/视频壁纸管理器。
 使用独立的 portghost C++ 渲染器和 GNOME Shell 插件，支持静态优先、显式动态播放。
@@ -21,8 +21,8 @@ Forge 平铺兼容性、原因与测试：[docs/FORGE-COMPATIBILITY.md](docs/FOR
 ## 验证范围与限制
 
 当前本地验证平台为 Debian 13、GNOME 48、Wayland、x86_64。
-上游 metadata 声明 GNOME 45–50，并不代表本项目 v0 已在这些版本全部验证。
-v0 运行包以 scene/video 为目标；不包含完整的 CEF Web 壁纸运行依赖。
+上游 metadata 声明 GNOME 45–50，并不代表本项目已在这些版本全部验证。
+当前运行包以 scene/video 为目标；不包含完整的 CEF Web 壁纸运行依赖。
 静态模式不启动渲染器、音频采集或鼠标桥；轮换开启时保留必要的调度。
 高质量截图会有短暂额外负载，任务结束即退出，不改变普通动态播放设置。
 不提供自动登录启动脚本；手动启用 GNOME 扩展本身可能在后续登录恢复启用状态。
@@ -76,7 +76,8 @@ runtime/、reports/、backups/、logs/           本地状态/报告/备份，�
 - [上游项目与依赖](third_party/README.md)
 - [更新记录](CHANGELOG.md)
 
-`main` 包含最新文档；`v0` 标签保留首次发布的历史快照。
+当前稳定版本为 `v0.0.1`，发布说明见 [v0.0.1](docs/releases/v0.0.1.md)。
+`main` 为稳定分支，`dev` 为开发分支；`v0` 标签保留首次发布的历史快照。
 
 ## 开源许可与来源
 
