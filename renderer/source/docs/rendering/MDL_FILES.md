@@ -1,6 +1,6 @@
 # MDL Files
 These seem to be simple model files containing the required information to render 3D objects.
-They're also used in some 2D backgrounds (like 2879436369) for bones.
+They're also used for skeletal animation in some 2D backgrounds.
 
 **NOTE**: This documentation page is not completed yet as there's still work left to do on the reverse engineering of this file format. For now just a structure, describing the file format is here
 

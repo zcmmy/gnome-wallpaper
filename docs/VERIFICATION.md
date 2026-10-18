@@ -57,4 +57,4 @@ check-static-overview 还需要本机装有 Blur my Shell 和 Dash to Dock；它
 - `python3 integration/tests/check-runtime-capture.py`：使用隔离副本中的场景和视频，验证独立高质量任务、1080p 输出、原生背景和缩略图更新；PID/FPS 不变、帧数继续增长。
 - 管理 UI 测试额外检查按钮仅在当前动态壁纸可用，以及取消确认不发送覆盖请求。
 
-集成结果保存在 `reports/hq-recapture/`。测试使用自备的韶华和星极素材，不改实际桌面或原始图库。
+集成结果保存在 `reports/hq-recapture/`。测试使用自备的场景与视频素材，不改实际桌面或原始图库。

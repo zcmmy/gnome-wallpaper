@@ -44,7 +44,8 @@ python3 integration/tests/check-forge.py hot-update
 ```
 
 集成测试需要本机已安装 Forge、Blur my Shell、Dash to Dock 和 Rounded Windows，
-以及默认位于相邻 wallpaper-runtime 的独立运行包和 2835142671 壁纸。
+以及默认位于相邻 wallpaper-runtime 的独立运行包和自备场景素材。
+测试脚本保留本机开发素材的定位约定，运行前需按自己的素材调整测试配置。
 可用 `WALLPAPER_TEST_RUNTIME` 指定运行包，用 `FORGE_BASELINE_REF` 指定对照提交。
 测试复制这些扩展和配置到独立 XDG/DBus/headless Shell，仅操作隔离会话。
 前后比对真实桌面 dconf，输出位于忽略的 reports/forge/。

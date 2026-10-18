@@ -292,7 +292,7 @@ can drive it:
 
 ```
 { printf '{"id":1,"cmd":"status"}\n'; sleep 1; } | socat - "UNIX-CONNECT:$XDG_RUNTIME_DIR/lwe/engine.sock"
-{ printf '{"id":2,"cmd":"show","args":{"id":"1311951951"}}\n'; sleep 5; } | socat - "UNIX-CONNECT:$XDG_RUNTIME_DIR/lwe/engine.sock"
+{ printf '{"id":2,"cmd":"show","args":{"id":"YOUR_WORKSHOP_ID"}}\n'; sleep 5; } | socat - "UNIX-CONNECT:$XDG_RUNTIME_DIR/lwe/engine.sock"
 { printf '{"id":3,"cmd":"next"}\n'; sleep 1; } | socat - "UNIX-CONNECT:$XDG_RUNTIME_DIR/lwe/engine.sock"
 ```
 
@@ -358,7 +358,7 @@ Good to know:
   such as -1; write a path that starts with a dash as `./-name`.
 
 ```
-linux-wallpaperengine --screen DP-1 --wallpaper 2317494988 --resclamp 0 --texturedetail full --speed 0.5 --color "1.1 1 1.2 15" --watchdog 10m
+linux-wallpaperengine --screen DP-1 --wallpaper "YOUR_WORKSHOP_ID" --resclamp 0 --texturedetail full --speed 0.5 --color "1.1 1 1.2 15" --watchdog 10m
 ```
 
 ### Plainer flag names

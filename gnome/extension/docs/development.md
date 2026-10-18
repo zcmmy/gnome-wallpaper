@@ -102,7 +102,7 @@ argv by hand — copy it from `_buildMpvArgv()`/`_buildWallpaperEngineArgv()`:
 
 ```bash
 mpv --no-config --force-window=yes --wayland-app-id=gwe-mpv-renderer ~/Videos/test.webm
-linux-wallpaperengine --window 0x0x1920x1080 --fps 60 --scaling fill 1845706469
+linux-wallpaperengine --window 0x0x1920x1080 --fps 60 --scaling fill "YOUR_WORKSHOP_ID"
 ```
 
 ### Schema changes

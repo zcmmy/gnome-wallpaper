@@ -168,7 +168,7 @@ gnome-extensions prefs wallpaperengine@waylandwe
    `~/.local/share/Steam/steamapps/workshop/content/431960/<ITEM_ID>/`.
    The ID is also the number in the wallpaper's Workshop URL.
 3. In **Steam Wallpaper Engine** → **Workshop Item ID or Scene Path**, enter the
-   numeric ID (e.g. `1845706469`) or paste a full path to a scene folder/`.pkg`.
+   numeric ID (replace `YOUR_WORKSHOP_ID` with your own ID) or paste a full path to a scene folder/`.pkg`.
 4. If your Steam library is in a non-default location, set **Workshop Content
    Folder** accordingly. **Assets Folder** can usually stay empty
    (auto-detected from Steam).
@@ -193,7 +193,7 @@ gsettings set org.gnome.shell.extensions.wallpaperengine enabled false
 gsettings set org.gnome.shell.extensions.wallpaperengine enabled true
 
 # Switch wallpapers
-gsettings set org.gnome.shell.extensions.wallpaperengine wallpaper-id '1845706469'
+gsettings set org.gnome.shell.extensions.wallpaperengine wallpaper-id 'YOUR_WORKSHOP_ID'
 gsettings set org.gnome.shell.extensions.wallpaperengine video-path "$HOME/Videos/rain.webm"
 
 # Power saving

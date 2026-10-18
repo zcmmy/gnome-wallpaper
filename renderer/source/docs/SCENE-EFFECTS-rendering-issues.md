@@ -1,24 +1,12 @@
-# OS Waves (3014738359) - Rendering Issues Investigation
+# Scene Effects Rendering Investigation
 
 Investigation of rendering differences between linux-wallpaperengine and the native
-Windows Wallpaper Engine for the OS Waves wallpaper (workshop ID 3014738359).
+Windows Wallpaper Engine for scenes using combined image, text, and audio-reactive effects.
 
-## Wallpaper Structure
+## Relevant scene techniques
 
-The wallpaper consists of 8 scene objects rendered in this order:
-
-| Object ID | Name | Type | Effects | Status |
-|-----------|------|------|---------|--------|
-| 85 | Solid1 | Image (solid) | None | Renders correctly |
-| 173 | Windows_logo_-_2021.svg | Image | Pulse (audio) | Renders, audio response may differ |
-| 57 | 1024px-Archlinux-icon-crystal-64.svg | Image | Pulse (audio) | Renders, audio response may differ |
-| 61 | ubuntu-icon-logo-png-transparent | Image | Pulse (audio) | Renders, audio response may differ |
-| 140 | Clock | Text | N/A | Renders via CText |
-| 45 | cust | Image (passthrough) | None | **Skipped** (passthrough with no effects) |
-| 71 | 13 | Image | Water waves | Renders via shader |
-| 36 | 14 | Image | Water waves | Renders via shader |
-
-Bloom is applied as a post-processing pass (via `wpenginelinux.json`).
+This investigation applies to scenes combining solid/image layers, audio pulse effects,
+text rendering, passthrough images, water-wave effects, and post-processing bloom.
 
 ## Issues Found
 
@@ -26,13 +14,13 @@ Bloom is applied as a post-processing pass (via `wpenginelinux.json`).
 
 **Files:** `src/WallpaperEngine/Data/Parsers/DynamicValueParser.cpp::scriptSource`
 
-The wallpaper defines 4 user settings with embedded JavaScript that dynamically
+Some wallpapers define user settings with embedded JavaScript that dynamically
 control object position (Y and Z axes) via slider properties. The parser stores the
 script body on the value (DynamicValue.cpp::setScriptSource) and the script engine
 compiles and registers it per property (ScriptEngine.cpp::queueScript), so the
 sliders drive object position as authored.
 
-Example script from the wallpaper:
+Illustrative property-update pattern:
 ```javascript
 export function update(value) {
     value.y = scriptProperties.posY;  // slider 0-100
@@ -44,7 +32,7 @@ export function update(value) {
 
 **Files:** `src/WallpaperEngine/Render/Wallpapers/CScene.cpp::CText`
 
-Object 140 ("Clock") is a text object and is rendered by `CText`, which rasterizes
+Text objects are rendered by `CText`, which rasterizes
 glyphs through FreeType. The font bundled with the wallpaper is loaded first from
 the asset container, with a system font as fallback
 (CText.cpp::loadEmbeddedFont).
@@ -61,7 +49,7 @@ origin-plus-size extent (CScene.cpp::isAuto).
 
 **Files:** `CImage.cpp::passthrough`
 
-Object 45 ("cust") uses passthrough mode with no effects attached, and the render
+Some image layers use passthrough mode with no effects attached, and the render
 path returns early for that combination (CImage.cpp::passthrough). A passthrough
 layer that does carry effects renders: it keeps its destination quad full-screen in
 local FBO space and passes scene-space positions through
@@ -74,14 +62,14 @@ appear.
 
 **Files:** `src/WallpaperEngine/Audio/Drivers/Recorders/PulseAudioPlaybackRecorder.cpp::update`
 
-The pulse effect on the OS logos uses:
+An audio pulse effect can use:
 - `AUDIOPROCESSING=3`
 - `audioamount=1.0`, `audiobounds=0.5-1.0`, `audioexponent=0.35`
 
 The DSP algorithm for audio spectrum analysis may produce different results than
 the Windows implementation.
 
-**Impact:** Logo pulse animations may respond differently to audio.
+**Impact:** Image pulse animations may respond differently to audio.
 
 ### 6. Fullscreen/autosize behavior incomplete (LOW)
 
@@ -95,7 +83,7 @@ scene dimensions, but autosize behavior is undefined.
 ## parallaxDepth UserSetting support
 
 `parallaxDepth` is declared as a `UserSetting` rather than a plain `glm::vec2`,
-because the wallpaper's scene.json uses it as a UserSetting object:
+because scenes may encode it as a UserSetting object:
 ```json
 {"user": "parallaxstrength", "value": "0.19000 0.19000"}
 ```
@@ -117,5 +105,5 @@ linux-wallpaperengine \
   --assets-dir ~/.local/share/Steam/steamapps/common/wallpaper_engine/assets \
   --screen-root DP-2 --screen-root HDMI-A-1 \
   --fps 60 --silent \
-  ~/.local/share/Steam/steamapps/workshop/content/431960/3014738359
+  "/path/to/your/scene"
 ```

@@ -58,7 +58,7 @@ fetch:
    ```
 
 3. In the preferences, **Steam Wallpaper Engine → Workshop Item ID or Scene
-   Path**: enter the numeric ID (e.g. `1845706469`) — it's the number in the
+   Path**: enter the numeric ID (replace `YOUR_WORKSHOP_ID` with your own ID) — it's the number in the
    wallpaper's Workshop URL and the folder name above. A full absolute path to
    a scene directory or `.pkg` file also works.
 4. **Workshop Content Folder** — only change this if your Steam library lives
@@ -120,7 +120,7 @@ S=org.gnome.shell.extensions.wallpaperengine
 gsettings set $S enabled false          # pause/stop the wallpaper
 gsettings set $S enabled true           # start it again
 
-gsettings set $S wallpaper-id '1845706469'
+gsettings set $S wallpaper-id 'YOUR_WORKSHOP_ID'
 gsettings set $S video-path "$HOME/Videos/rain.webm"
 gsettings set $S engine mpv             # auto | wallpaperengine | mpv
 
