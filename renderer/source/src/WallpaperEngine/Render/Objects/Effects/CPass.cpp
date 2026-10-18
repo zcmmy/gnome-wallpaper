@@ -1197,6 +1197,12 @@ void CPass::setupTextureUniforms () {
 	    this->m_textures[index] = chain;
 	} catch (std::runtime_error& ex) {
 	    sLog.error ("Cannot resolve user texture ", textureName, " for pass ", ex.what ());
+	    // A missing user image/Windows shortcut icon is empty, not the
+	    // opaque util/white placeholder used to size its layer.
+	    this->m_textures[index] = std::make_shared<TextureChainEntry> (TextureChainEntry{
+		.texture = std::make_shared<SolidColorTexture> (glm::vec4 (0.0f)),
+		.next = nullptr,
+	    });
 	}
     }
 
@@ -1234,6 +1240,12 @@ void CPass::setupTextureUniforms () {
 	    this->m_textures[index] = chain;
 	} catch (std::runtime_error& ex) {
 	    sLog.error ("Cannot resolve user texture ", textureName, " for override ", ex.what ());
+	    // A missing user image/Windows shortcut icon is empty, not the
+	    // opaque util/white placeholder used to size its layer.
+	    this->m_textures[index] = std::make_shared<TextureChainEntry> (TextureChainEntry{
+		.texture = std::make_shared<SolidColorTexture> (glm::vec4 (0.0f)),
+		.next = nullptr,
+	    });
 	}
     }
 

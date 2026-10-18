@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DISPOSABLE = (
     'runtime/capture-test', 'runtime/manager-hot-test', 'runtime/manager-test',
     'runtime/manager-ui-test', 'runtime/static-background-test',
-    'runtime/static-overview-test', 'runtime/nested',
+    'runtime/static-overview-test', 'runtime/runtime-capture-test', 'runtime/nested',
     'gnome/extension/__pycache__', 'gnome/scripts/__pycache__',
     'integration/tests/__pycache__', 'integration/scripts/__pycache__',
 )

@@ -129,6 +129,25 @@ export function fillManagerWindow(window, settings) {
         if (settings.get_boolean('enabled')) dispatch('retry');
         else settings.set_boolean('enabled', true);
     }); detail.append(capture);
+    let lastCaptureResult = null;
+    try {lastCaptureResult=JSON.parse(settings.get_string('runtime-status')).runtimeCapture?.request ?? null;} catch (_) {}
+    const runtimeCapture = button('高质量截图并替换静态图…', () => {
+        const item=model.selected;
+        if(!item || !model.connected)return;
+        const dialog=new Adw.AlertDialog({heading:'用高质量截图替换静态图？',body:'将为「'+item.title+'」另开一次高质量截图任务，成功后覆盖其静态图片。场景以 4K 渲染后缩小至 1080p；视频按原始画面采样。动态播放继续，帧率设置不变。截图时刻可能与桌面不同，任务期间会额外占用资源。'});
+        dialog.add_response('cancel','取消');dialog.add_response('capture','截图并替换');
+        dialog.set_close_response('cancel');dialog.set_response_appearance('capture',Adw.ResponseAppearance.DESTRUCTIVE);
+        dialog.choose(window,null,(dlg,res)=>{
+            if(dlg.choose_finish(res)!=='capture')return;
+            if(settings.get_string('selected-id')!==item.id){toast('当前壁纸已切换，未截图。');return;}
+            settings.set_string('manager-command',JSON.stringify({action:'capture-static',id:item.id,request:GLib.uuid_string_random()}));
+        });
+    });
+    runtimeCapture.set_tooltip_text('后台独立生成高质量静态图；播放继续，截图时刻可能不同。');detail.append(runtimeCapture);
+    function updateCaptureAction(status) {
+        runtimeCapture.set_sensitive(model.connected && status.runtimeCaptureSupported===true && status.runtimeCaptureQuality==='4k-to-1080p' && status.state==='dynamic' &&
+            !status.capturing && !!model.selected?.supported && model.selected.id===settings.get_string('selected-id'));
+    }
     const replace = button('选择静态图片…', () => {
         const item = model.selected;
         if (!item) return;
@@ -163,6 +182,8 @@ export function fillManagerWindow(window, settings) {
         replace.set_sensitive(!!item);removeButton.set_sensitive(!!item);
         capture.set_visible(!!item && !item.ready && item.supported);
         capture.set_sensitive(model.connected);
+        let status={};try{status=JSON.parse(settings.get_string('runtime-status'));}catch(_){}
+        updateCaptureAction(status);
     }
     flow.connect('selected-children-changed', () => {const child=flow.get_selected_children()[0];if(child)show(child._item);});
     flow.set_filter_func(child => {
@@ -198,6 +219,11 @@ export function fillManagerWindow(window, settings) {
         syncing=true;mode.set_active(settings.get_boolean('enabled'));syncing=false;
         mode.set_sensitive(model.connected); actions.set_sensitive(model.connected); refresh.set_sensitive(true);
         if(model.selected){apply.set_sensitive(model.connected);capture.set_sensitive(model.connected);}
+        updateCaptureAction(status);
+        const result=status.runtimeCapture;
+        if(result?.request && result.state!=='capturing' && lastCaptureResult!==result.request){
+            lastCaptureResult=result.request;if(result.message)toast(result.message);
+        }
         updateDeadline();
     }
 
@@ -267,5 +293,5 @@ export function fillManagerWindow(window, settings) {
     window.connect('close-request',()=>{if(busy){toast('正在处理壁纸文件，请稍候');return true;}model.closed=true;if(rotationRebuild)GLib.source_remove(rotationRebuild);rotationRebuild=0;cancel.cancel();for(const id of signals)settings.disconnect(id);signals.length=0;return false;});
     reload();
     // Exposed to the isolated UI driver; no automatic actions or timers.
-    return {model,flow,search,filter,apply,mode,importButton,removeButton,capture,fps,rotate,interval,sequence,all,rotationList:list,reload,show,pages:[page,rotationPage,options]};
+    return {model,flow,search,filter,apply,mode,importButton,removeButton,capture,runtimeCapture,fps,rotate,interval,sequence,all,rotationList:list,reload,show,pages:[page,rotationPage,options]};
 }

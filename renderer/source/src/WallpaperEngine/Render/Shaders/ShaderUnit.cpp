@@ -1,4 +1,5 @@
 #include "ShaderUnit.h"
+#include "SourceCompatibility.h"
 #include "WallpaperEngine/Logging/StatePaths.h"
 #include <filesystem>
 #include <fstream>
@@ -86,7 +87,7 @@ ShaderUnit::ShaderUnit (
 }
 
 void ShaderUnit::preprocess () {
-    this->m_preprocessed = this->m_content;
+    this->m_preprocessed = repairLegacyEffectSource (this->m_content);
     this->m_includes = "";
 
     this->preprocessIncludes ();

@@ -256,7 +256,7 @@ JSValue get_layer (JSContext* ctx, JSValueConst this_val, int argc, JSValueConst
 	}
     }
 
-    return JS_ThrowTypeError (ctx, "layer not found");
+    return JS_UNDEFINED;
 }
 
 JSValue scene_set_value (JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv) {

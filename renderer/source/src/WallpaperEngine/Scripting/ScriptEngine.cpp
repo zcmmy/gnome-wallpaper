@@ -110,7 +110,7 @@ JSValue ScriptEngine::dynamicToJs (DynamicValue& value) const {
     }
 }
 
-static void jsToDynamicValue (JSContext* ctx, JSValue val, DynamicValue& source) {
+void ScriptEngine::updateFromJs (JSContext *ctx, JSValueConst val, DynamicValue &source) {
     if (JS_IsException (val)) {
 	return;
     }
@@ -139,7 +139,7 @@ static void jsToDynamicValue (JSContext* ctx, JSValue val, DynamicValue& source)
 
     if (tag == JS_TAG_STRING) {
 	const char* str = JS_ToCString (ctx, val);
-	source.update (str == nullptr ? "" : str, DynamicValue::UpdateSource::Script);
+	source.update (std::string (str == nullptr ? "" : str), DynamicValue::UpdateSource::Script);
 	JS_FreeCString (ctx, str);
 	return;
     }
@@ -612,10 +612,19 @@ JSValue ScriptEngine::call (JSValue module, int argc, JSValue argv[], const char
 	return JS_UNDEFINED;
     }
 
+    if (m_runningModule && m_runningModule->object) {
+	JS_SetPropertyStr (m_context, m_globalThis, "thisLayer",
+			   m_adapters.object->instantiate (*const_cast<ScriptableObject *> (m_runningModule->object)));
+    }
     return JS_Call (this->m_context, function, module, argc, argv);
 }
 
 void ScriptEngine::queueScript (const std::string& key, DynamicValue& currentValue, ScriptableObject& object) {
+    if (currentValue.getScriptSource ().has_value ())
+	m_pendingScripts.push_back ({key, &currentValue, &object});
+}
+
+void ScriptEngine::registerScript (const std::string &key, DynamicValue &currentValue, ScriptableObject &object) {
     static const bool s_scriptDbg = getenv ("LWE_SCRIPTDBG") != nullptr;
     const auto source = currentValue.getScriptSource ();
 
@@ -746,7 +755,7 @@ void ScriptEngine::queueScript (const std::string& key, DynamicValue& currentVal
 	sLog.error ("Script module '", key, "' init() threw:");
 	logJSException (this->m_context, key.c_str ());
     } else {
-	jsToDynamicValue (this->m_context, initResult, scriptSpace);
+	updateFromJs (this->m_context, initResult, scriptSpace);
 	storeBack ();
     }
 
@@ -766,15 +775,17 @@ void ScriptEngine::queueScript (const std::string& key, DynamicValue& currentVal
 	return;
     }
 
-    jsToDynamicValue (this->m_context, result, scriptSpace);
+    updateFromJs (this->m_context, result, scriptSpace);
     storeBack ();
 }
 
 void ScriptEngine::unregisterScriptable (const ScriptableObject* object) {
+    std::erase_if (m_pendingScripts, [object] (const PendingScript &entry) { return entry.object == object; });
     if (object == nullptr) {
 	return;
     }
 
+    this->m_adapters.object->forget (object);
     for (auto it = this->m_scriptModules.begin (); it != this->m_scriptModules.end ();) {
 	if (it->second.object != object) {
 	    ++it;
@@ -793,6 +804,13 @@ void ScriptEngine::unregisterScriptable (const ScriptableObject* object) {
 }
 
 void ScriptEngine::tick () {
+    // init() may refer to a later layer or a non-drawing parent group. All scene
+    // objects and render order must exist before evaluating property modules.
+    auto pending = std::move (m_pendingScripts);
+    m_pendingScripts.clear ();
+    for (const auto &entry : pending)
+	registerScript (entry.key, *entry.value, *entry.object);
+
     // run intervals
     this->m_engineObject->tick ();
 
@@ -838,7 +856,7 @@ void ScriptEngine::tick () {
 
 	try {
 	    if (bridgeAngles) {
-		jsToDynamicValue (this->m_context, result, *module.degreesMirror);
+		updateFromJs (this->m_context, result, *module.degreesMirror);
 		if (module.degreesMirror->getType () == DynamicValue::Vec3) {
 		    module.value.update (
 			glm::radians (module.degreesMirror->getVec3 ()), DynamicValue::UpdateSource::Script
@@ -847,7 +865,7 @@ void ScriptEngine::tick () {
 		    module.value.update (*module.degreesMirror, DynamicValue::UpdateSource::Script);
 		}
 	    } else {
-		jsToDynamicValue (this->m_context, result, module.value);
+		updateFromJs (this->m_context, result, module.value);
 	    }
 	} catch (const std::exception&) { }
     }
@@ -986,6 +1004,8 @@ void ScriptEngine::dispatchCursorEvents () {
 		sLog.out ("LWE-CURSORDBG FIRE ", hook, " on ", key);
 	    }
 	    this->m_runningModule = &module;
+	    JS_SetPropertyStr (m_context, m_globalThis, "thisLayer",
+			       m_adapters.object->instantiate (*const_cast<ScriptableObject *> (module.object)));
 	    JSValue event = this->makeCursorEvent (worldPosition, localPosition.value_or (glm::vec3 (0.0f)));
 	    JSValue args[] = { event };
 	    JSValue result = JS_Call (this->m_context, fn, JS_UNDEFINED, 1, args);

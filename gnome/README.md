@@ -47,9 +47,11 @@ GUI 通过设置变化发出命令，不持有渲染器；关闭 GUI 不影响�
 禁止对运行中扩展使用 cp/copytree 覆盖 gschemas.compiled；该文件被 GSettings 内存映射，破坏后可能令整个 Shell 致命退出。
 安装器不修改 GSettings、不启用插件。原子映射保护与无效更新保留原文件由 tests/check-schema-update.py 验证。
 
-高质量静态截图（2026-10-17）：captureWorker.py 是仅任务期间运行的 Python/GdkPixbuf 辅助程序，使用私有 D-Bus、XDG 目录和无界面的 GNOME Wayland 合成器运行一次性渲染器，不连接实际桌面。依赖系统已有 python3-gi、GdkPixbuf、gnome-shell、dbus-run-session 和 gdbus。默认场景 4K 渲染后保存 1080p；视频从原生帧缩小。任务按用户串行执行，正常完成、超时、切换壁纸、关闭动态或禁用扩展均清理子进程；用户自行提供的静态图优先，禁止覆盖。
+高质量静态截图（2026-10-17）：captureWorker.py 是仅任务期间运行的 Python/GdkPixbuf 辅助程序，使用私有 D-Bus、XDG 目录和无界面的 GNOME Wayland 合成器运行一次性渲染器，不连接实际桌面。依赖系统已有 python3-gi、GdkPixbuf、gnome-shell、dbus-run-session 和 gdbus。默认场景 4K 渲染后保存 1080p；视频从原生帧缩小。任务按用户串行执行，正常完成、超时、切换壁纸、关闭动态或禁用扩展均清理子进程；缺图自动生成优先保护用户自行提供的静态图，不覆盖已有图片。
 缺少静态图时仍遵循显式授权规则：静态模式只提示，用户开启动态后才后台生成高质量静态图。普通播放进程不传 screenshot 参数。截图会产生短暂额外负载，结束后无常驻截图服务。失败保留原生背景，可重新开启动态重试。
 独立调用：python3 /路径/gnome/wallpaperengine@waylandwe/captureWorker.py --renderer /路径/bin/renderer --assets /路径/assets --scene /路径/wallpapers/ID --output /路径/output.png
 --diagnostics DIR 保存过程日志和实际 FBO 尺寸；--quality standard --freeze 仅用于固定动画状态的对照测试。
 
 静态概览背景：staticOverview.js 仅在概览/应用列表可见且动态画面未就绪时，创建 GNOME BackgroundManager 原生背景层，复用当前原生壁纸与缓存。退出概览后销毁 actor 和对应背景管理器；不启动渲染器、截图任务、鼠标桥或轮询计时器。动态画面就绪时由原有动态概览层接管，禁用扩展时释放信号。integration/tests/check-static-overview.py 在隔离 GNOME 中结合当前 Blur my Shell、Dash to Dock 配置验证切换和清理，并生成应用列表截图。
+
+运行时手动截图由 `runtimeCapture.js` 管理；复用缺图自动生成的 `captureWorker.py --quality high`，另开私有渲染器完成场景 4K→1080p 截图（视频按原生帧采样）。截图时刻可能不同；不改变播放进程、帧率、频谱或鼠标设置。等待 worker 完成并回收私有进程后，原子替换静态图、缩略图和原生背景。失败、换图或取消保留旧静态图；UI 明确确认后才允许覆盖。

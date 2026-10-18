@@ -153,6 +153,13 @@ std::pair<std::string, std::string> GLSLContext::toGlsl (const std::string& vert
     vertexShader.setAutoMapBindings (true);
 
     if (!vertexShader.parse (&BuiltInResource, 100, false, EShMsgDefault)) {
+	if (getenv ("LWE_SHADERDUMP") != nullptr) {
+	    std::istringstream src (vertex);
+	    std::string line;
+	    int n = 0;
+	    while (std::getline (src, line))
+		sLog.error ("VERTSRC ", ++n, ": ", line);
+	}
 	sLog.exception ("GLSL vertex unit parsing Failed: ", vertexShader.getInfoLog ());
     }
     glslang::TShader fragmentShader (EShLangFragment);

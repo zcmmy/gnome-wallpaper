@@ -75,6 +75,7 @@ public:
     JSValue getGlobalThis () const { return m_globalThis; }
     LoadedModule* getRunningModule () const { return m_runningModule; }
     JSValue dynamicToJs (DynamicValue& value) const;
+    static void updateFromJs (JSContext* ctx, JSValueConst value, DynamicValue& target);
     static void logException (JSContext* ctx, const char* context);
 
     /**
@@ -153,6 +154,13 @@ public:
     const std::map<std::string, std::unique_ptr<Modules::ScriptModule>>& getModules () const { return m_modules; }
 
 private:
+    struct PendingScript {
+        std::string key;
+        DynamicValue* value;
+        ScriptableObject* object;
+    };
+    std::vector<PendingScript> m_pendingScripts;
+    void registerScript (const std::string& key, DynamicValue& value, ScriptableObject& object);
     JSValue call (JSValue module, int argc, JSValueConst argv[], const char* name);
 
     void installBuiltins ();
