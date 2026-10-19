@@ -29,7 +29,7 @@ export class WallpaperManager {
         if (this.dead) return;
         this.ext._staticOverview?.sync();
         const e = this.ext;
-        const status = {version:13, active:true, selected:this.settings.get_string('selected-id'),
+        const status = {version:14, packageProtocol:1, active:true, selected:this.settings.get_string('selected-id'),
             state:state ?? (e._procStopping ? 'stopping' : e._rendererReady ? 'dynamic' : e._proc ? 'loading' : this.error ? 'error' : 'static'),
             dynamic:this.settings.get_boolean('enabled'), pid:e._proc?.get_identifier() ?? null,
             fps:this.settings.get_int('fps'), staticOverview:!!e._staticOverview, captureQuality:'4k-to-1080p', error:this.error, capturing:!!this.capture || !!this.runtimeCapture?.job, runtimeCaptureSupported:true, runtimeCaptureQuality:'4k-to-1080p', runtimeCapture:this.runtimeCapture?.result ?? null,
@@ -256,6 +256,6 @@ export class WallpaperManager {
         this.dbus?.unexport();
         if (this.timer) GLib.source_remove(this.timer); this.timer = 0;
         this.runtimeCapture.cancel(); this.cancelCapture(); this.clearWatchdog();
-        this.settings.set_string('runtime-status', JSON.stringify({version:13,active:false,state:'disabled'}));
+        this.settings.set_string('runtime-status', JSON.stringify({version:14,packageProtocol:1,active:false,state:'disabled'}));
     }
 }

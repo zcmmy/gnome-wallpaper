@@ -7,6 +7,13 @@ GNOME 负责窗口归属/层级、原生静态背景、概览、鼠标桥、UI �
 插件不链接 C++ 库；IPC 不传送帧图像。配置通过 GSettings，画面通过 Wayland surface。
 独立截图辅助任务属于 GNOME 适配工具，使用同一个渲染可执行程序；不常驻。
 
+## 完整包重构
+
+`packaging/build-backend.sh` 使用路径映射编译后端，`packaging/build-package.py` 组装程序白名单和依赖闭包。
+`common/paths.js` 管理程序与 XDG 数据路径，`helpers/dataWorker.py` 管理资源事务，`resourceSetup.js` 提供导入及迁移界面。
+`packaging/install.py` 负责校验、停止自身任务、原子安装与回滚。当前桌面不随构建迁移。
+完整验收和运行说明见 [完整包](FULL-PACKAGE.md)。
+
 ## 构建
 
 ```text

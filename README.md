@@ -1,7 +1,10 @@
 # GNOME Wallpaper — v0.0.3
 
 GNOME Wayland 上的 Wallpaper Engine 场景/视频壁纸管理器。
-使用独立的 portghost C++ 渲染器和 GNOME Shell 插件，支持静态优先、显式动态播放。
+使用独立进程的 portghost C++ 渲染器和 GNOME Shell 插件，支持静态优先、显式动态播放。
+
+当前功能分支正在实施完整扩展发行包：后端和私有库随插件安装，资源由设置界面导入。
+见 [完整包安装与构建](docs/FULL-PACKAGE.md)；稳定版本和旧 Release 不会被此分支自动替换。
 项目：[zcmmy/gnome-wallpaper](https://github.com/zcmmy/gnome-wallpaper)
 
 ## 功能
@@ -29,7 +32,7 @@ Forge 平铺兼容性、原因与测试：[docs/FORGE-COMPATIBILITY.md](docs/FOR
 
 ## 获取、构建、安装
 
-当前源码为 **v0.0.3**，包含多语言文字与工作区焦点修复；本版本未发布 Release 安装包。
+当前稳定基线为 **v0.0.3**，本功能分支的完整包尚未发布 Release。
 已发布的安装包仍为 [v0.0.2 插件安装包](https://github.com/zcmmy/gnome-wallpaper/releases/tag/v0.0.2)，
 按 [插件安装说明](docs/PLUGIN-INSTALL.md) 安装或更新。插件 ZIP 不包含 C++ 渲染器和用户素材。
 
@@ -45,7 +48,9 @@ make help
 
 ```text
 make renderer               编译 C++，可能下载固定版本的 CEF 构建依赖
-make extension              仅生成插件 ZIP，不安装、不启用
+make package-backend        构建完整包使用的后端（不安装系统组件）
+make extension              组装完整插件候选包，不安装、不启用
+make extension-dev          仅打包 JS/Python，供开发测试使用
 make check                  本地回归；C++ 视频测试需要已构建的渲染库
 make package DEST=/新目录   打包独立运行目录，目标必须不存在
 ```
@@ -62,7 +67,8 @@ renderer/source/         修改后的 portghost 渲染源码（已裁剪未使�
 renderer/scripts/       渲染层构建、运行入口；renderer/tests/ 为独立测试
 gnome/extension/         修改后的 GNOME 扩展、管理 UI 与一次性任务
 gnome/scripts/          插件打包、原子安装及会话工具；gnome/tests/ 为独立测试
-integration/            两层协议、打包、维护、图形集成测试
+integration/            两层协议、历史运行包、维护、图形集成测试
+packaging/              完整程序包、依赖清单、安全安装、迁移和隔离验收
 third_party/            固定上游来源、基线改动索引和许可证引用
 docs/                   安装、架构、开发、运行、验证、版本管理文档
 sources/、tools/         旧命令及 CMake 缓存的兼容入口

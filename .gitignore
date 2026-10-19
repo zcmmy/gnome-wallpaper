@@ -24,3 +24,5 @@ gschemas.compiled
 
 # Local internal development documents; not distributed.
 /docs/internal/
+
+/dist/

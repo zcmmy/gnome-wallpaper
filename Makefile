@@ -1,6 +1,7 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 export DEST
+export WALLPAPER_BUILD_DIR
 
 .PHONY: release-package help build renderer extension check check-renderer check-gnome check-maintenance check-licenses check-integration check-overview check-runtime-capture stage-manager stage-ui package inventory clean-tests clean-tests-apply
 
@@ -13,9 +14,11 @@ help:
 build: renderer extension
 renderer:
 	bash renderer/scripts/build.sh
-extension:
+extension-dev:
 	bash gnome/scripts/build.sh
-check: check-renderer check-gnome check-maintenance check-licenses
+extension:
+	python3 packaging/build-package.py --build-dir "$${WALLPAPER_BUILD_DIR:-$(CURDIR)/build/package-renderer}" --output "$${DEST:-$(CURDIR)/dist/development}"
+check: check-renderer check-gnome check-maintenance check-licenses check-packaging
 check-renderer:
 	bash renderer/tests/check.sh
 check-gnome:
@@ -43,3 +46,10 @@ clean-tests:
 	python3 -B integration/scripts/maintenance.py clean-tests
 clean-tests-apply:
 	python3 -B integration/scripts/maintenance.py clean-tests --apply
+
+check-packaging:
+	python3 packaging/test-data.py
+	python3 packaging/test-install.py
+
+package-backend:
+	bash packaging/build-backend.sh

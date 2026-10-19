@@ -2,6 +2,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GdkPixbuf from 'gi://GdkPixbuf';
 import {WallpaperManager} from '../extension/manager.js';
+import {thumbnailPath} from '../extension/common/paths.js';
 import {RuntimeCapture} from '../extension/runtimeCapture.js';
 const assert=(v,m)=>{if(!v)throw new Error(m);};
 const root=GLib.getenv('TEST_LIBRARY'),scene=root+'/live';GLib.mkdir_with_parents(scene,0o700);
@@ -25,7 +26,7 @@ c.start('live','success');const first=c.job;assert(first,'capture not started: '
 png(requested,0x0000ffff);c.complete(first);
 assert(isBlue()&&c.result.state==='done'&&!c.job,'still replacement failed');
 assert(ext._proc===proc&&settings.get_boolean('enabled')&&settings.get_int('fps')===15,'playback configuration changed');
-assert(Gio.File.new_for_path(scene+'/thumbnail.jpg').query_exists(null),'thumbnail missing');
+assert(Gio.File.new_for_path(thumbnailPath(scene)).query_exists(null),'thumbnail missing');
 assert(new Gio.Settings({schema_id:'org.gnome.desktop.background'}).get_string('picture-uri').endsWith('/live/static-background.png'),'native background missing');
 assert(!Gio.File.new_for_path(first.directory).query_exists(null),'output directory leaked');
 c.start('live','changed');const changed=c.job;

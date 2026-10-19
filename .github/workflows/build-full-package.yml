@@ -1,0 +1,18 @@
+name: Build full Debian package
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: debian:13
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build locked inputs and corresponding sources
+        run: bash packaging/container-build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-extension-release
+          path: dist/v*/
+          if-no-files-found: error
