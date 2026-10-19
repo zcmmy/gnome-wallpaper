@@ -7,7 +7,7 @@ output_zip="$1"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/schemas"
-cp "$extension_root/../../LICENSE" "$extension_root/../../NOTICE.md" "$stage/"
+cp "$extension_root/../../LICENSE" "$extension_root/../../NOTICE.md" "$extension_root/../../VERSION" "$stage/"
 cp "$extension_root"/captureWorker.py "$extension_root"/libraryWorker.py "$stage/"
 cp "$extension_root"/*.js "$extension_root/metadata.json" "$stage/"
 cp "$extension_root"/schemas/*.gschema.xml "$stage/schemas/"
@@ -20,6 +20,11 @@ if out.suffix != '.zip':raise SystemExit('Output must be a .zip file')
 out.parent.mkdir(parents=True,exist_ok=True)
 with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
  for p in sorted(stage.rglob('*')):
-  if p.is_file():z.write(p,p.relative_to(stage))
+  if p.is_file():
+   info=zipfile.ZipInfo(p.relative_to(stage).as_posix(),date_time=(1980,1,1,0,0,0))
+   info.create_system=3
+   info.external_attr=0o100644 << 16
+   info.compress_type=zipfile.ZIP_DEFLATED
+   z.writestr(info,p.read_bytes(),compresslevel=9)
 print(out)
 ARCHIVE

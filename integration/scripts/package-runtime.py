@@ -94,7 +94,7 @@ schema=org.gnome.shell.extensions.wallpaperengine
 gsettings set "$schema" wallpaperengine-path "$root/bin/renderer"
 gsettings set "$schema" assets-path "$root/assets"
 gsettings set "$schema" library-root "$root/wallpapers"
-gsettings set "$schema" selected-id 2835142671
+gsettings reset "$schema" selected-id
 gsettings set "$schema" enabled false
 gsettings set "$schema" rotation-enabled false
 gsettings set "$schema" rotation-interval 30

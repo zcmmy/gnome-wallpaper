@@ -1,4 +1,4 @@
-# GNOME Wallpaper — v0.0.1
+# GNOME Wallpaper — v0.0.2
 
 GNOME Wayland 上的 Wallpaper Engine 场景/视频壁纸管理器。
 使用独立的 portghost C++ 渲染器和 GNOME Shell 插件，支持静态优先、显式动态播放。
@@ -28,6 +28,10 @@ Forge 平铺兼容性、原因与测试：[docs/FORGE-COMPATIBILITY.md](docs/FOR
 不提供自动登录启动脚本；手动启用 GNOME 扩展本身可能在后续登录恢复启用状态。
 
 ## 获取、构建、安装
+
+下载 [v0.0.2 插件安装包](https://github.com/zcmmy/gnome-wallpaper/releases/tag/v0.0.2)，
+按 [插件安装说明](docs/PLUGIN-INSTALL.md) 安装或更新。插件 ZIP 不包含 C++ 渲染器和用户素材。
+
 
 ```bash
 git clone git@github.com:zcmmy/gnome-wallpaper.git
@@ -77,7 +81,7 @@ runtime/、reports/、backups/、logs/           本地状态/报告/备份，�
 - [上游项目与依赖](third_party/README.md)
 - [更新记录](CHANGELOG.md)
 
-当前稳定版本为 `v0.0.1`，发布说明见 [v0.0.1](docs/releases/v0.0.1.md)。
+当前稳定版本为 `v0.0.2`，发布说明见 [v0.0.2](docs/releases/v0.0.2.md)。
 `main` 为稳定分支，`dev` 为开发分支；`v0` 标签保留首次发布的历史快照。
 
 ## 开源许可与来源

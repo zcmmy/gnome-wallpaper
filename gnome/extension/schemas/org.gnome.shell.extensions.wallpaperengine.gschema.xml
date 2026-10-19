@@ -29,7 +29,7 @@
     <key name="wallpaper-id" type="s">
       <default>''</default>
       <summary>Wallpaper Engine scene</summary>
-      <description>Steam Workshop item ID (e.g. 1845706469) or an absolute path to a scene directory / .pkg file, used by the linux-wallpaperengine backend.</description>
+      <description>Steam Workshop item ID or an absolute path to a scene directory / .pkg file, used by the linux-wallpaperengine backend.</description>
     </key>
 
     <key name="workshop-path" type="s">
@@ -96,7 +96,7 @@
 
 
     <key name="library-root" type="s"><default>''</default><summary>Prepared wallpaper library</summary></key>
-    <key name="selected-id" type="s"><default>'2835142671'</default><summary>Selected library item</summary></key>
+    <key name="selected-id" type="s"><default>''</default><summary>Selected library item</summary></key>
     <key name="library-revision" type="i"><default>0</default><summary>Explicit library refresh generation</summary></key>
     <key name="static-revision" type="i"><default>0</default><summary>Explicit static image replacement generation</summary></key>
     <key name="rotation-enabled" type="b"><default>false</default><summary>Rotate wallpapers</summary></key>
