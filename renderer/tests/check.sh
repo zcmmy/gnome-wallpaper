@@ -27,3 +27,9 @@ LD_LIBRARY_PATH="$renderer_output:${LD_LIBRARY_PATH:-}" "$test_dir/video-texture
 "${CXX:-g++}" -std=c++20 -I"$source_dir" "$WALLPAPER_ROOT/renderer/tests/check-puppet.cpp" \
     -L"$renderer_output" -llinux-wallpaperengine-lib -o "$test_dir/puppet"
 LD_LIBRARY_PATH="$renderer_output:${LD_LIBRARY_PATH:-}" "$test_dir/puppet" ${PUPPET_TEST_MODEL:+"$PUPPET_TEST_MODEL"}
+
+"${CXX:-g++}" -std=c++20 -O2 -Wall -Wextra -I"$source_dir" \
+    $(pkg-config --cflags fontconfig freetype2) "$WALLPAPER_ROOT/renderer/tests/check-unicode-text.cpp" \
+    $(pkg-config --libs fontconfig freetype2) -o "$test_dir/unicode-text"
+"$test_dir/unicode-text" "${UNICODE_TEST_LATIN_FONT:-/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf}" \
+    "${UNICODE_TEST_CJK_FONT:-/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc}"
