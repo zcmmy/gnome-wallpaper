@@ -8,6 +8,7 @@ import Gio from 'gi://Gio';
 import Meta from 'gi://Meta';
 import Clutter from 'gi://Clutter';
 import {holdCompositing, releaseCompositing} from './compositingGuard.js';
+import {restoreWorkspaceFocus} from './windowFocus.js';
 import {PointerBridge} from './pointerBridge.js';
 import {OverviewWallpaper} from './overviewWallpaper.js';
 import {StaticOverview} from './staticOverview.js';
@@ -23,7 +24,7 @@ const MPV_APP_ID = 'gwe-mpv-renderer';
 
 // Bumped on every code change; logged from enable() so we can tell which
 // revision the running shell actually loaded (see the comment there).
-const CODE_REVISION = 14;
+const CODE_REVISION = 15;
 
 const SIGTERM = 15;
 const SIGCONT = 18;
@@ -667,8 +668,8 @@ export default class WallpaperEngineExtension extends Extension {
             this._refocusNormalWindow(window);
         });
 
-        // The renderer stole focus when it mapped; give it back to the most
-        // recently used normal window.
+        // Only return focus if mapping actually focused the renderer.
+        // Never activate an application from a different workspace.
         this._refocusNormalWindow(window);
         this._startPointerBridge();
         const reveal = () => {
@@ -691,13 +692,7 @@ export default class WallpaperEngineExtension extends Extension {
     }
 
     _refocusNormalWindow(rendererWindow) {
-        const tabList = global.display
-            .get_tab_list(Meta.TabList.NORMAL, null)
-            .filter(w => w !== rendererWindow && !w.skip_taskbar);
-        if (tabList.length > 0)
-            tabList[0].activate(global.get_current_time());
-        else
-            global.display.unset_input_focus(global.get_current_time());
+        restoreWorkspaceFocus(rendererWindow);
     }
 
     _forgetWindow() {

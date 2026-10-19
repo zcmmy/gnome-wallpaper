@@ -2,7 +2,7 @@
     "uuid": "wallpaperengine@waylandwe",
     "name": "GNOME Wallpaper",
     "description": "Static-first wallpaper library and explicit animated scene/video playback on GNOME Wayland, powered by the separate portghost renderer. Includes previews, rotation and high-quality still capture. User-provided resources required.",
-    "version": 2,
+    "version": 3,
     "shell-version": [
         "45",
         "46",

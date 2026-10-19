@@ -1,5 +1,8 @@
 # GNOME Wallpaper v0.0.2 插件安装
 
+> 本文对应已发布的 v0.0.2 安装包。当前源码已更新为 v0.0.3，但本次不发布 Release 附件；
+> v0.0.2 下载包不含多语言文字与工作区焦点修复。源码升级范围见 [v0.0.3 版本说明](releases/v0.0.3.md)。
+
 ## 下载与校验
 
 从 [v0.0.2 Release](https://github.com/zcmmy/gnome-wallpaper/releases/tag/v0.0.2) 下载以下四个文件到同一空目录：
