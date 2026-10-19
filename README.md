@@ -58,7 +58,7 @@ make package DEST=/新目录   打包独立运行目录，目标必须不存在
 ## 目录
 
 ```text
-renderer/source/         修改后的 portghost 渲染源码（完整纳入顶层 Git）
+renderer/source/         修改后的 portghost 渲染源码（已裁剪未使用的 UI 与演示资源）
 renderer/scripts/       渲染层构建、运行入口；renderer/tests/ 为独立测试
 gnome/extension/         修改后的 GNOME 扩展、管理 UI 与一次性任务
 gnome/scripts/          插件打包、原子安装及会话工具；gnome/tests/ 为独立测试

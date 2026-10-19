@@ -15,7 +15,7 @@
 # Modified for FFmpeg-example Tuukka Pasanen 2018
 #
 # Redistribution and use is allowed according to the terms of the New
-# BSD license.
+# BSD license. See the accompanying COPYING-CMAKE-SCRIPTS file.
 #
 
 include(FindPackageHandleStandardArgs)

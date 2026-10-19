@@ -5,7 +5,7 @@
 本次仅推送 dev/main，v0.0.3 附注标签保留在本地；推送 v* 标签会触发 Release 工作流，因此未经发布授权不要推送该标签。
 未发布功能先进入 dev，达到发布条件并完成审查后再合并到 main；普通功能提交不代表新版本发布。
 renderer/source、gnome/extension 均是顶层仓库中的普通源码目录，不是 gitlink/submodule。
-选择完整源码快照是为了让本地补丁可随一次 clone 获得，避免引用只有开发机才有的提交。
+采用纳入顶层 Git 的源码快照，让本地补丁可随一次 clone 获得；已裁剪未使用的上游 UI 和演示资源，范围见 third_party/sources.lock.json。
 不自动推送回上游项目，不依赖原始嵌套 .git。
 
 ## 常规开发

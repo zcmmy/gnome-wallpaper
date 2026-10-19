@@ -21,3 +21,6 @@ gschemas.compiled
 .idea/
 .vscode/
 .DS_Store
+
+# Local internal development documents; not distributed.
+/docs/internal/

@@ -2,24 +2,26 @@
 SHELL := /bin/bash
 export DEST
 
-.PHONY: release-package help build renderer extension check check-renderer check-gnome check-maintenance check-integration check-overview check-runtime-capture stage-manager stage-ui package inventory clean-tests clean-tests-apply
+.PHONY: release-package help build renderer extension check check-renderer check-gnome check-maintenance check-licenses check-integration check-overview check-runtime-capture stage-manager stage-ui package inventory clean-tests clean-tests-apply
 
 release-package:
 	python3 integration/scripts/package-release.py
 
 help:
-	@printf '%s\n' 'build / renderer / extension: build only; no installation' 'release-package: plugin release assets in build/releases/VERSION (must not exist)' 'check: renderer, GNOME and cleanup safety checks' 'check-integration / check-overview: isolated graphical tests' 'stage-manager / stage-ui: prepare isolated test sessions' 'package DEST=/new/path: create an independent runtime' 'inventory: directory sizes and Git status' 'clean-tests: preview disposable test directories' 'clean-tests-apply: remove stopped test directories after safety checks'
+	@printf '%s\n' 'build / renderer / extension: build only; no installation' 'release-package: plugin release assets in build/releases/VERSION (must not exist)' 'check: renderer, GNOME, license notices and cleanup safety checks' 'check-integration / check-overview: isolated graphical tests' 'stage-manager / stage-ui: prepare isolated test sessions' 'package DEST=/new/path: create an independent runtime' 'inventory: directory sizes and Git status' 'clean-tests: preview disposable test directories' 'clean-tests-apply: remove stopped test directories after safety checks'
 
 build: renderer extension
 renderer:
 	bash renderer/scripts/build.sh
 extension:
 	bash gnome/scripts/build.sh
-check: check-renderer check-gnome check-maintenance
+check: check-renderer check-gnome check-maintenance check-licenses
 check-renderer:
 	bash renderer/tests/check.sh
 check-gnome:
 	bash gnome/tests/check.sh
+check-licenses:
+	python3 -B integration/tests/check-runtime-notices.py
 check-maintenance:
 	python3 -B integration/tests/check-maintenance.py
 check-integration:
