@@ -2,7 +2,7 @@
 
 开发中的完整发行包面向 Debian 13 / GNOME 48 / Wayland / x86_64。
 它包含场景/视频后端及私有运行库；图形驱动、GNOME 桌面、Python/PyGObject、Fontconfig 配置与字体由系统提供；中文、日文、韩文显示需要对应字体。
-安装器预检宿主与后端依赖，不在安装时联网或编译。当前构建不是跨发行版通用二进制。
+安装器预检宿主与后端依赖，不在安装时联网或编译后端。当前构建不是跨发行版通用二进制。
 
 ## 安装
 
@@ -38,7 +38,7 @@ python3 install.py ./gnome-wallpaper-<版本>-linux-x86_64.shell-extension.zip
 python3 install.py --restore /安装目录的同级备份目录
 ```
 
-回滚只交换程序，不删除图库、assets 或静态图。普通卸载也只删除程序目录。
+回滚交换程序，不删除图库、assets 或静态图。跨回旧 runtime 版本时，安装器使用备份旁的 `.settings.json` 恢复旧后端入口；图库位置、FPS 等用户设置保持当前值，请一并保留该备份文件及旧 runtime。普通卸载也只删除程序目录。
 
 ## 构建与来源
 

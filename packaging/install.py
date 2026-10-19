@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """One-entry, atomic full extension installer. User data is never installed or removed."""
-import argparse,ctypes,hashlib,json,os,pathlib,platform,shutil,stat,subprocess,tempfile,time,uuid,zipfile
+import argparse,ast,ctypes,hashlib,json,os,pathlib,platform,shutil,stat,subprocess,tempfile,time,uuid,zipfile
 UUID='wallpaperengine@waylandwe'
 
 def verify(directory):
@@ -66,12 +66,25 @@ def stop_owned_tasks(destination):
         time.sleep(.1)
     raise ValueError('Wallpaper tasks have not stopped. Original installation retained.')
 
-def exchange(stage,destination):
+def legacy_program_settings(destination):
+    if not destination.exists() or (destination/'package-manifest.json').exists():return None
+    env=dict(os.environ,GSETTINGS_SCHEMA_DIR=str(destination/'schemas'))
+    return {key:ast.literal_eval(subprocess.check_output(['gsettings','get','org.gnome.shell.extensions.wallpaperengine',key],env=env,text=True))
+            for key in ['wallpaperengine-path','engine']}
+
+def restore_legacy_program_settings(destination,settings):
+    if not settings:return
+    env=dict(os.environ,GSETTINGS_SCHEMA_DIR=str(destination/'schemas'))
+    for key in ['wallpaperengine-path','engine']:
+        if key not in settings or not isinstance(settings[key],str):raise ValueError('Invalid legacy program settings')
+        subprocess.run(['gsettings','set','org.gnome.shell.extensions.wallpaperengine',key,json.dumps(settings[key],ensure_ascii=False)],env=env,check=True)
+
+def exchange(stage,destination,backup=None):
     if not destination.exists():stage.rename(destination);return None
     if destination.is_symlink():raise ValueError('Installation destination must not be a symlink')
     libc=ctypes.CDLL(None,use_errno=True)
     if libc.renameat2(-100,os.fsencode(stage),-100,os.fsencode(destination),2):raise OSError(ctypes.get_errno(),'Atomic install failed')
-    backup=destination.parent/('.'+UUID+'.backup-'+uuid.uuid4().hex)
+    backup=backup or destination.parent/('.'+UUID+'.backup-'+uuid.uuid4().hex)
     try:stage.rename(backup)
     except OSError:
         # Restore the previous directory before the staging cleanup can run.
@@ -84,17 +97,24 @@ def install(archive,destination,desktop=True):
     destination.parent.mkdir(parents=True,exist_ok=True)
     stage=pathlib.Path(tempfile.mkdtemp(prefix='.wallpaper-install-',dir=destination.parent))
     preserve_stage=False
+    proposed=destination.parent/('.'+UUID+'.backup-'+uuid.uuid4().hex)
+    settings_file=proposed.with_name(proposed.name+'.settings.json')
     try:
         manifest=extract(archive,stage);preflight(stage)
         # Compile in staging, never truncate a schema mmap in the active installation.
         subprocess.run(['glib-compile-schemas','--strict',str(stage/'schemas')],check=True)
+        legacy=legacy_program_settings(destination) if desktop else None
+        if legacy:
+            fd=os.open(settings_file,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+            with os.fdopen(fd,'w') as stream:json.dump(legacy,stream);stream.flush();os.fsync(stream.fileno())
         if desktop:stop_owned_tasks(destination)
-        backup=exchange(stage,destination)
+        backup=exchange(stage,destination,proposed)
         return {'installed':str(destination),'version':manifest['version'],'backup':str(backup) if backup else None,'reload':'next login','user_data':'preserved'}
     except Exception as error:
         preserve_stage=getattr(error,'preserve_stage',False);raise
     finally:
         if stage.exists() and not preserve_stage:shutil.rmtree(stage)
+        if not proposed.exists() and not preserve_stage:settings_file.unlink(missing_ok=True)
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('archive',type=pathlib.Path,nargs='?');p.add_argument('--destination',type=pathlib.Path);p.add_argument('--yes',action='store_true');p.add_argument('--isolated',action='store_true',help='test destination only; never touches session settings');p.add_argument('--restore',type=pathlib.Path)
@@ -107,8 +127,17 @@ def main():
         backup=args.restore.absolute()
         if backup.parent!=destination.parent or not backup.name.startswith('.'+UUID+'.backup-') or backup.is_symlink():raise ValueError('Invalid rollback directory')
         if json.loads((backup/'metadata.json').read_text())['uuid']!=UUID:raise ValueError('Invalid rollback identity')
+        legacy=None
+        if (backup/'package-manifest.json').exists():verify(backup)
+        elif not args.isolated:
+            sidecar=backup.with_name(backup.name+'.settings.json')
+            if not sidecar.is_file():raise ValueError('Legacy rollback needs its saved program-settings sidecar')
+            legacy=json.loads(sidecar.read_text())
+            if set(legacy)!={'wallpaperengine-path','engine'} or not all(isinstance(v,str) for v in legacy.values()):raise ValueError('Invalid rollback settings')
         if not args.isolated:stop_owned_tasks(destination)
-        print(json.dumps({'restored':str(destination),'backup':str(exchange(backup,destination))}));return
+        retained=exchange(backup,destination)
+        if not args.isolated:restore_legacy_program_settings(destination,legacy)
+        print(json.dumps({'restored':str(destination),'backup':str(retained),'reload':'next login','user_data':'preserved'}));return
     if not args.archive:p.error('Select a full extension ZIP')
     print(json.dumps(install(args.archive,destination,not args.isolated),ensure_ascii=False))
 if __name__=='__main__':main()

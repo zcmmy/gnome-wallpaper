@@ -29,6 +29,11 @@ class InstallerTests(unittest.TestCase):
         dest=self.root/'stage';dest.mkdir()
         with self.assertRaises(ValueError):installer.extract(self.archive(extra={'../escape':b'bad'}),dest)
         self.assertFalse((self.root/'escape').exists())
+    def test_legacy_settings_restore_only_program_keys(self):
+        with patch.object(installer.subprocess,'run') as run:
+            installer.restore_legacy_program_settings(self.root,{'wallpaperengine-path':'/old program/renderer','engine':'wallpaperengine'})
+        self.assertEqual([c.args[0][3] for c in run.call_args_list],['wallpaperengine-path','engine'])
+        self.assertNotIn('fps',str(run.call_args_list));self.assertNotIn('library-root',str(run.call_args_list))
     def test_rollback_preserves_user_data(self):
         current=self.root/'installed';current.mkdir();(current/'data').write_text('new');old=self.root/'old';old.mkdir();(old/'data').write_text('old');user=self.root/'wallpapers';user.mkdir();(user/'static.png').write_text('user')
         installer.exchange(old,current);self.assertEqual((current/'data').read_text(),'old');self.assertEqual((user/'static.png').read_text(),'user')
