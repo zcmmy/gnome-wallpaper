@@ -21,6 +21,7 @@ XDG_STATE_HOME="$stage/state" GSETTINGS_BACKEND=memory gjs -m "$root/gnome/tests
 GSETTINGS_SCHEMA_DIR="$stage/schemas" XDG_STATE_HOME="$stage/state-manager" TEST_LIBRARY="$stage/library" GSETTINGS_BACKEND=memory dbus-run-session -- gjs -m "$root/gnome/tests/check-manager.js"
 XDG_STATE_HOME="$stage/state-runtime-capture" TEST_LIBRARY="$stage/runtime-capture" GSETTINGS_BACKEND=memory dbus-run-session -- gjs -m "$root/gnome/tests/check-runtime-capture.js"
 gjs "$root/gnome/tests/check-extension-restart.js" "$root/gnome/extension/wallpaperExtension.js"
+gjs "$root/gnome/tests/check-workspace-focus.js" "$root/gnome/extension/windowFocus.js"
 gjs "$root/gnome/tests/check-compositing-guard.js" "$root/gnome/extension/compositingGuard.js"
 gjs "$root/gnome/tests/check-forge-filter.js" "$root/gnome/extension/wallpaperExtension.js"
 "$root/gnome/extension/scripts/package.sh" "$stage/extension.zip"
