@@ -1,6 +1,6 @@
 import json,os,pathlib,signal,subprocess,time
 r=pathlib.Path(__file__).resolve().parents[2];out=r/'reports/hq-capture'
-args=['python3',str(r/'gnome/extension/captureWorker.py'),'--renderer',str(r/'renderer/scripts/run.sh'),'--assets',str(r/'assets'),'--scene',str(r/'wallpapers/3721991999'),'--output',str(out/'cancelled.png')]
+args=['python3',str(r/'gnome/extension/captureWorker.py'),'--renderer',str(r/'renderer/scripts/run.sh'),'--assets',str(r/'assets'),'--scene',str(r/'wallpapers'/os.environ['WALLPAPER_TEST_REFERENCE']),'--output',str(out/'cancelled.png')]
 def related():
  result=set()
  for path in pathlib.Path('/proc').glob('[0-9]*/cmdline'):

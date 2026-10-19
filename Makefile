@@ -3,15 +3,16 @@ SHELL := /bin/bash
 export DEST
 export WALLPAPER_BUILD_DIR
 
-.PHONY: release-package help build renderer extension check check-renderer check-gnome check-maintenance check-licenses check-integration check-overview check-runtime-capture stage-manager stage-ui package inventory clean-tests clean-tests-apply
+.PHONY: extension-dev package-backend check-packaging release-package help build renderer extension check check-renderer check-gnome check-maintenance check-licenses check-integration check-overview check-runtime-capture stage-manager stage-ui package inventory clean-tests clean-tests-apply
 
 release-package:
 	python3 integration/scripts/package-release.py
 
 help:
-	@printf '%s\n' 'build / renderer / extension: build only; no installation' 'release-package: plugin release assets in build/releases/VERSION (must not exist)' 'check: renderer, GNOME, license notices and cleanup safety checks' 'check-integration / check-overview: isolated graphical tests' 'stage-manager / stage-ui: prepare isolated test sessions' 'package DEST=/new/path: create an independent runtime' 'inventory: directory sizes and Git status' 'clean-tests: preview disposable test directories' 'clean-tests-apply: remove stopped test directories after safety checks'
+	@printf '%s\n' 'build / renderer / extension: build only; no installation' 'release-package: full release assets and sources in dist/VERSION (must not exist)' 'check: renderer, GNOME, license notices and cleanup safety checks' 'check-integration / check-overview: isolated graphical tests' 'stage-manager / stage-ui: prepare isolated test sessions' 'package DEST=/new/path: create an independent runtime' 'inventory: directory sizes and Git status' 'clean-tests: preview disposable test directories' 'clean-tests-apply: remove stopped test directories after safety checks'
 
-build: renderer extension
+build: package-backend
+	$(MAKE) extension
 renderer:
 	bash renderer/scripts/build.sh
 extension-dev:

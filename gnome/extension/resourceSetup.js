@@ -48,11 +48,13 @@ export function addResourceSetup(window,page,settings) {
     const refresh=()=>{const state=backendStatus();backend.subtitle=initializationError|| (state.ready?'已内置 · '+state.version:state.error);assets.subtitle=assetsReady()?'已导入':'尚未导入；静态模式仍可使用';library.subtitle=paths.data;};
     async function execute(request) {
         if(active)throw new Error('已有资源任务正在运行');
-        const plan=await resourceOperation({...request,plan:true});
-        if(!await confirm(window,'导入资源？',`将复制约 ${(plan.bytes/1048576).toFixed(1)} MiB，跳过 ${plan.skipped.length} 个已有项目。`+(request.operation==='import'?'':'\n此操作会停止动态播放与截图，完成后保持静态模式。')))return null;
-        if(request.operation!=='import')await stopPlayback(settings);
-        active=new Gio.Cancellable();progress.visible=true;cancel.visible=true;
+        active=new Gio.Cancellable();progress.visible=true;progress.fraction=0;progress.text='正在检查资源…';cancel.visible=true;
         try {
+            const plan=await resourceOperation({...request,plan:true},()=>{},active);
+            if(active.is_cancelled()||!await confirm(window,'导入资源？',`将复制约 ${(plan.bytes/1048576).toFixed(1)} MiB，跳过 ${plan.skipped.length} 个已有项目。`+(request.operation==='import'?'':'\n此操作会停止动态播放与截图，完成后保持静态模式。')))return null;
+            if(active.is_cancelled())return null;
+            if(request.operation!=='import')await stopPlayback(settings);
+            if(active.is_cancelled())return null;
             const result=await resourceOperation(request,data=>{progress.fraction=data.total?Math.min(1,data.progress/data.total):0;progress.text=`${(data.progress/1048576).toFixed(1)} / ${(data.total/1048576).toFixed(1)} MiB`;},active);
             refreshFiles(settings);toast('资源导入完成');return result;
         }finally{active=null;progress.visible=false;cancel.visible=false;refresh();}

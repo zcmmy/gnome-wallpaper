@@ -15,7 +15,11 @@ ext=folder/'wallpaperengine@waylandwe';shutil.copy2(r/'packaging/ui-driver.js',e
 p=ext/'wallpaperExtension.js';s=p.read_text()+"\nimport {startTest} from './testDriver.js';\n";s=s.replace('        this._manager.start();','        this._manager.start();\n        if(!globalThis.__packageTestStarted){globalThis.__packageTestStarted=true;GLib.idle_add(0,()=>{startTest(this);return false;});}');p.write_text(s)
 subprocess.run(['glib-compile-schemas',str(ext/'schemas')],check=True)
 (t/'app.py').write_text("import gi,signal\ngi.require_version('Gtk','3.0')\nfrom gi.repository import Gtk,GLib\nw=Gtk.Window(title='Empty workspace regression app');w.set_default_size(600,400);w.add(Gtk.Label(label='APPLICATION CONTENT'));w.connect('destroy',Gtk.main_quit);w.show_all()\nsignal.signal(signal.SIGUSR1,lambda *_:GLib.idle_add(w.fullscreen));signal.signal(signal.SIGUSR2,lambda *_:GLib.idle_add(w.unfullscreen))\nGtk.main()\n")
-scene=os.environ.get('WALLPAPER_TEST_ID')
+video='--video' in sys.argv[2:]
+if video:
+ scene='合成 视频';fixture=t/'fixtures'/scene
+ subprocess.run(['/usr/bin/python3',str(r/'packaging/video-fixture.py'),str(fixture)],check=True)
+else:scene=os.environ.get('WALLPAPER_TEST_ID')
 if not scene:
  for path in sorted((bundle/'wallpapers').iterdir()):
   try:
@@ -30,7 +34,7 @@ for k,n in [('XDG_RUNTIME_DIR','run'),('XDG_CONFIG_HOME','config'),('XDG_DATA_HO
 (t/'output').mkdir()
 env.update(TEST_SCENE=scene,TEST_CASE=label,WALLPAPER_BUNDLE=str(bundle),GDK_BACKEND='wayland',TEST_PROFILE=str(t),TEST_OUT=str(t/'output'),GSETTINGS_SCHEMA_DIR=str(ext/'schemas'),GIO_USE_VFS='local',GVFS_DISABLE_FUSE='1')
 data=t/'data/gnome-wallpaper'
-for request in [{'operation':'assets','assets':str(bundle/'assets')},{'operation':'import','source':str(bundle/'wallpapers'/scene)}]:
+for request in [{'operation':'assets','assets':str(bundle/'assets')},{'operation':'import','source':str(fixture if video else bundle/'wallpapers'/scene)}]:
  with (out/'import.log').open('a') as log:
   subprocess.run(['/usr/bin/python3',str(ext/'helpers/dataWorker.py'),'--root',str(data)],input=json.dumps(request),text=True,env=env,stdout=log,check=True)
 for name in ['forge','blur-my-shell','dash-to-dock','rounded-windows']:

@@ -39,6 +39,10 @@ class DataTests(unittest.TestCase):
             with self.assertRaises(ValueError):self.runop(operation='import',source=str(self.source))
         (self.root/'library.json').write_text('{"version":999}')
         with self.assertRaises(ValueError):self.runop(operation='import',source=str(self.source))
+    def test_managed_symlink_rejected(self):
+        self.root.mkdir();(self.root/'wallpapers').symlink_to(self.source,target_is_directory=True)
+        with self.assertRaises(ValueError):self.runop(operation='import',source=str(self.source))
+        self.assertTrue((self.scene/'project.json').exists())
     def test_plan_and_space(self):
         plan=self.runop(operation='import',source=str(self.source),plan=True);self.assertGreater(plan['bytes'],0);self.assertFalse(list((self.root/'wallpapers').iterdir()))
         with patch.object(shutil,'disk_usage',return_value=type('Space',(),{'free':0})()):

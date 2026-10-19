@@ -34,6 +34,9 @@ def preflight(stage):
     if 'ID=debian' not in os_release or 'VERSION_ID="13"' not in os_release:raise ValueError('This build supports Debian 13 only')
     for command in ['gjs','gnome-shell','glib-compile-schemas','gdbus','dbus-run-session','python3']:
         if not shutil.which(command):raise ValueError('Missing GNOME host component: '+command)
+    shell_version=subprocess.check_output(['gnome-shell','--version'],text=True).split()[-1]
+    if shell_version.split('.')[0]!='48':raise ValueError('This build requires GNOME 48')
+    subprocess.run(['gjs','-c',"imports.gi.versions.Gtk='4.0'; imports.gi.versions.Adw='1'; void imports.gi.Gtk; void imports.gi.Adw;"],check=True)
     subprocess.run(['/usr/bin/python3','-c',"import gi; gi.require_version('GdkPixbuf','2.0'); from gi.repository import GdkPixbuf"],check=True)
     subprocess.run([str(stage/'backend/linux-x86_64/bin/renderer'),'--check'],check=True,stdout=subprocess.DEVNULL)
 
@@ -69,11 +72,18 @@ def exchange(stage,destination):
     libc=ctypes.CDLL(None,use_errno=True)
     if libc.renameat2(-100,os.fsencode(stage),-100,os.fsencode(destination),2):raise OSError(ctypes.get_errno(),'Atomic install failed')
     backup=destination.parent/('.'+UUID+'.backup-'+uuid.uuid4().hex)
-    stage.rename(backup);return backup
+    try:stage.rename(backup)
+    except OSError:
+        # Restore the previous directory before the staging cleanup can run.
+        if libc.renameat2(-100,os.fsencode(stage),-100,os.fsencode(destination),2):
+            error=RuntimeError('Backup rename failed; preserved previous files at '+str(stage));error.preserve_stage=True;raise error
+        raise
+    return backup
 
 def install(archive,destination,desktop=True):
     destination.parent.mkdir(parents=True,exist_ok=True)
     stage=pathlib.Path(tempfile.mkdtemp(prefix='.wallpaper-install-',dir=destination.parent))
+    preserve_stage=False
     try:
         manifest=extract(archive,stage);preflight(stage)
         # Compile in staging, never truncate a schema mmap in the active installation.
@@ -81,8 +91,10 @@ def install(archive,destination,desktop=True):
         if desktop:stop_owned_tasks(destination)
         backup=exchange(stage,destination)
         return {'installed':str(destination),'version':manifest['version'],'backup':str(backup) if backup else None,'reload':'next login','user_data':'preserved'}
+    except Exception as error:
+        preserve_stage=getattr(error,'preserve_stage',False);raise
     finally:
-        if stage.exists():shutil.rmtree(stage)
+        if stage.exists() and not preserve_stage:shutil.rmtree(stage)
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('archive',type=pathlib.Path,nargs='?');p.add_argument('--destination',type=pathlib.Path);p.add_argument('--yes',action='store_true');p.add_argument('--isolated',action='store_true',help='test destination only; never touches session settings');p.add_argument('--restore',type=pathlib.Path)

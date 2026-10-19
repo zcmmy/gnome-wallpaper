@@ -12,6 +12,11 @@ export async function startTest(ext) {
     try {
         await delay(2500);Main.overview.hide();await delay(700);
         assert(!ext._proc&&!ext._pointerBridge&&!ext._compositingRelease,'Static startup spawned a renderer or bridge');
+        Main.overview.showApps();await delay(1400);
+        const still=ext._staticOverview.snapshot();
+        assert(still.active&&still.mapped&&still.backgrounds.length>0&&still.backgrounds.every(b=>b.loaded),'Static application overview background absent');
+        Main.overview.hide();await delay(700);
+        assert(!ext._staticOverview.group&&!ext._proc,'Hidden static overview retained actors/process');
         const launcher=new Gio.SubprocessLauncher({flags:0});launcher.setenv('WAYLAND_DISPLAY','forge-test',true);
         app=launcher.spawnv(['python3',GLib.getenv('TEST_PROFILE')+'/app.py']);
         let win;

@@ -18,10 +18,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     env:
       RELEASE_TAG: ${{ inputs.tag }}
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
+      ARTIFACT_RUN: ${{ inputs.artifact_run }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,9 +41,12 @@ jobs:
           test -f "docs/releases/$RELEASE_TAG.md"
           test -f dist/release/dependency-corresponding-sources.tar.gz
           test -f dist/release/renderer-corresponding-source.tar.gz
+          gh api "repos/$GH_REPO/actions/runs/$ARTIFACT_RUN" > /tmp/build-run.json
+          SOURCE_COMMIT=$(git rev-parse HEAD) python3 -c 'import json,os; r=json.load(open("/tmp/build-run.json")); assert r["conclusion"]=="success" and r["head_sha"]==os.environ["SOURCE_COMMIT"] and r["path"]==".github/workflows/build-full-package.yml"'
+          export SOURCE_COMMIT=$(git rev-parse HEAD)
           cd dist/release
           sha256sum --check SHA256SUMS
-          python3 -c 'import json,os; m=json.load(open("backend-manifest.json")); assert m["version"]==os.environ["RELEASE_TAG"]'
+          python3 -c 'import json,os; m=json.load(open("backend-manifest.json")); assert m["version"]==os.environ["RELEASE_TAG"] and m["renderer_build"]["commit"]==os.environ["SOURCE_COMMIT"]'
       - name: Create draft, upload assets, then publish
         run: |
           # A failed upload leaves a draft. Re-running resumes only that draft.

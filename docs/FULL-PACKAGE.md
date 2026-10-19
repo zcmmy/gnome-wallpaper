@@ -1,12 +1,12 @@
 # 完整插件安装与数据管理
 
 开发中的完整发行包面向 Debian 13 / GNOME 48 / Wayland / x86_64。
-它包含场景/视频后端及私有运行库；图形驱动、GNOME 桌面和宿主 Python/PyGObject 由系统提供。
+它包含场景/视频后端及私有运行库；图形驱动、GNOME 桌面、Python/PyGObject、Fontconfig 配置与字体由系统提供；中文、日文、韩文显示需要对应字体。
 安装器预检宿主与后端依赖，不在安装时联网或编译。当前构建不是跨发行版通用二进制。
 
 ## 安装
 
-将同次构建的 ZIP、`install.py` 和 `SHA256SUMS` 放在一起，先校验：
+将同次构建的全部附件放在同一目录，先校验：
 
 ```bash
 sha256sum --check SHA256SUMS
@@ -43,13 +43,16 @@ python3 install.py --restore /安装目录的同级备份目录
 ## 构建与来源
 
 ```bash
-python3 packaging/build-package.py --build-dir /已完成构建的目录 --output /新的输出目录
+make package-backend
+make extension DEST=/新的输出目录
 ```
 
 程序白名单排除用户 assets、壁纸、截图、日志与开发机配置；后端只装入 scene/video 组件，不包含 CEF。
-`backend-manifest.json` 列出宿主 ABI、私有库、哈希、来源包和后端构建提交。
+`backend-manifest.json` 列出宿主 ABI、私有库、哈希、来源包、头文件/协议源码输入、构建参数和提交；组包前核对后端构建记录与二进制哈希。
 `renderer-corresponding-source.tar.gz` 对应实际后端构建提交；私有 Debian 库的精确源包可由
 `fetch-sources.py backend-manifest.json /新的源码目录` 下载，版本不可替换。
 公开二进制发布前必须一并提供这些对应源码及构建材料并通过干净环境验收；本轮不自动发布 Release。
 
 构建依赖版本记录在 `packaging/debian13-build.lock.json`。`container-build.sh` 只能在一次性 Debian 容器中运行，版本不可用时失败，不自动换成新版本。容器基础镜像标签本身不保证字节级可复现；最终清单和库哈希才是本次产物身份。
+
+当前验证范围及发布前门槛见 [完整包验证记录](PACKAGING-VALIDATION.md)。

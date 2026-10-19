@@ -18,9 +18,11 @@ def source_identity(output):
     home=pathlib.Path(re.search(r'^CMAKE_HOME_DIRECTORY:INTERNAL=(.+)$',cache,re.M)[1])
     repo=pathlib.Path(run('git','-C',str(home),'rev-parse','--show-toplevel'))
     return {'commit':run('git','-C',str(repo),'rev-parse','HEAD'),'repository':'https://github.com/zcmmy/gnome-wallpaper',
-            'compiler':run('c++','--version').splitlines()[0],'configuration':'Release', 'source_root':repo}
+            'compiler':run('c++','--version').splitlines()[0],'configuration':'Release', 'source_root':repo,
+            'renderer_tree':run('git','-C',str(repo),'rev-parse','HEAD:renderer/source'),
+            'cmake_flags':{key:re.search(r'^'+key+r':[^=]+=(.*)$',cache,re.M)[1] for key in ['CMAKE_BUILD_TYPE','CMAKE_C_FLAGS','CMAKE_CXX_FLAGS']}}
 def package_identity(path,soname,sysroot):
-    if path.is_relative_to(sysroot):
+    if sysroot != pathlib.Path('/usr') and path.is_relative_to(sysroot):
         package=PRIVATE_LIBRARY_PACKAGES.get(soname)
         if not package:raise ValueError('Unmapped private input: '+soname)
         copyright=sysroot/'share/doc'/package/'copyright'
@@ -49,13 +51,33 @@ def build(args):
     libraries={n:pathlib.Path(p).resolve() for n,p in re.findall(r'^\s*(\S+) => (\S+) \(',linked,re.M)}
     out=args.output.absolute();out.mkdir(parents=True,exist_ok=False)
     identity=source_identity(output);source_repo=identity.pop('source_root')
+    identity['cmake_flags']={k:v.replace(str(source_repo),'<SOURCE>').replace(str((ROOT/'deps').resolve()),'<DEPS>') for k,v in identity['cmake_flags'].items()}
+    if run('git','-C',str(source_repo),'status','--porcelain','--','renderer/source'):
+        raise ValueError('Commit renderer sources before archiving corresponding source')
+    stamp=json.loads((args.build_dir/'backend-build.json').read_text())
+    if stamp.get('format')!=1 or stamp['renderer_tree']!=identity['renderer_tree'] or any(sha(output/name)!=digest for name,digest in stamp['outputs'].items()):
+        raise ValueError('Backend build provenance mismatch; run make package-backend')
     version=(ROOT/'VERSION').read_text().strip()
+    # Header/protocol source inputs contribute compiled code even without a shared object.
+    source_inputs=[]
+    for package in ['libglm-dev','wayland-protocols']:
+        fields=run('dpkg-query','-W','-f=${Version}\t${source:Package}\t${source:Version}',package).split('\t') if sysroot==pathlib.Path('/usr') else None
+        if fields:
+            binary_version,source,source_version=fields
+        else:
+            line=gzip.open(sysroot/'share/doc'/package/'changelog.Debian.gz','rt').readline()
+            source,source_version=re.match(r'(\S+) \(([^)]+)\)',line).groups()
+            pins=dict(line.strip().rsplit('=',1) for line in (ROOT/'deps/packages.txt').read_text().splitlines() if '=' in line)
+            binary_version=pins[package]
+        source_inputs.append({'package':package,'version':binary_version,'source_package':source,'source_version':source_version})
     with tempfile.TemporaryDirectory(prefix='wallpaper-package-') as temp:
         stage=pathlib.Path(temp);backend=stage/'backend/linux-x86_64'
         for folder in ['bin','lib']: (backend/folder).mkdir(parents=True)
         ext=ROOT/'gnome/extension'
         for p in ext.glob('*'):
             if p.is_file() and p.suffix in ['.js','.py','.json']:shutil.copy2(p,stage/p.name)
+        metadata=json.loads((stage/'metadata.json').read_text());metadata['shell-version']=['48']
+        (stage/'metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
         for name in ['common','helpers','schemas']:shutil.copytree(ext/name,stage/name,ignore=shutil.ignore_patterns('__pycache__','*.pyc','gschemas.compiled'))
         for name in ['LICENSE','NOTICE.md','VERSION']:shutil.copy2(ROOT/name,stage/name)
         subprocess.run(['glib-compile-schemas','--strict',str(stage/'schemas')],check=True)
@@ -89,8 +111,8 @@ def build(args):
         manifest={'format':1,'protocol':1,'version':version,'platform':'linux-x86_64','capabilities':['scene','video','capture-hq','pointer','spectrum','set-fps'],
                   'channel':'development','host':{'distribution':'Debian 13','gnome':'48','glibc_minimum':minimum,'libraries':host,
                           'commands':['gjs','gnome-shell','dbus-run-session','gdbus','python3'],
-                          'python_modules':['gi'],'gi_modules':['Gtk-4.0','Adw-1','GdkPixbuf-2.0']},
-                  'renderer_build':identity,'libraries':records}
+                          'python_modules':['gi'],'gi_modules':['Gtk-4.0','Adw-1','GdkPixbuf-2.0'],'font_resources':'Host Fontconfig configuration and fonts (CJK fonts needed for CJK text)'},
+                  'renderer_build':identity,'libraries':records,'source_inputs':source_inputs}
         (backend/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
         shutil.copy2(ROOT/'packaging/renderer-launcher.py',backend/'bin/renderer');(backend/'bin/renderer').chmod(0o755)
         # Probe loading using only private libs + declared host ABI; no scene/audio is initialized.

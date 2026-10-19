@@ -8,3 +8,5 @@ cmake -S "$root/renderer/source" -B "$build" -G Ninja \
   "-DCMAKE_C_FLAGS=-ffile-prefix-map=$root=. -ffile-prefix-map=$(readlink -f "$root/deps")=./deps" \
   "-DCMAKE_CXX_FLAGS=-ffile-prefix-map=$root=. -ffile-prefix-map=$(readlink -f "$root/deps")=./deps"
 cmake --build "$build" --target linux-wallpaperengine --parallel "${BUILD_JOBS:-4}"
+
+python3 "$root/packaging/record-build.py" "$build"

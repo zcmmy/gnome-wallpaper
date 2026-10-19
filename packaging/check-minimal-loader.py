@@ -5,7 +5,7 @@ p=argparse.ArgumentParser();p.add_argument('archive',type=pathlib.Path);a=p.pars
 spec=importlib.util.spec_from_file_location('installer',pathlib.Path(__file__).with_name('install.py'));installer=importlib.util.module_from_spec(spec);spec.loader.exec_module(installer)
 with tempfile.TemporaryDirectory(prefix='wallpaper-minimal-') as tmp:
  stage=pathlib.Path(tmp);installer.extract(a.archive,stage);backend=stage/'backend/linux-x86_64';m=json.loads((backend/'manifest.json').read_text())
- cache=subprocess.check_output(['ldconfig','-p'],text=True)
+ cache=subprocess.check_output(['/sbin/ldconfig','-p'],text=True)
  libraries={name:path for name,path in re.findall(r'^\s*(\S+) \(libc6,x86-64[^)]*\) => (.+)$',cache,re.M)}
  command=['bwrap','--unshare-net','--tmpfs','/','--proc','/proc','--dev','/dev','--dir','/tmp','--ro-bind',str(backend),'/package','--ro-bind','/lib64/ld-linux-x86-64.so.2','/lib64/ld-linux-x86-64.so.2']
  for name in m['host']['libraries']:

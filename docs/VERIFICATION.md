@@ -64,3 +64,12 @@ check-static-overview 还需要本机装有 Blur my Shell 和 Dash to Dock；它
 `make check-licenses` 验证运行包的声明复制、引用的通用许可全文、未知私有库与缺失声明的拒绝路径、
 Wayland 生成代码声明。测试仅使用临时合成文件，不访问图库或修改桌面。它也包含在 `make check` 中。
 许可全文的收集不替代对应源码交付及发布前的实际构建审查。
+
+## 完整包验收
+
+`make check` 包含路径、资源事务和原子安装单元测试。
+`python3 packaging/check-minimal-loader.py <完整 ZIP>` 验证私有库与声明的宿主 ABI 闭包。
+`python3 packaging/check-desktop.py <完整 ZIP>` 在独立 XDG/DBus/GNOME 中安装候选包，隐藏源码与旧 runtime，将程序目录绑定为只读，验证静态应用列表、管理界面、动态、工作区与 HQ 截图。
+该图形测试需要本机自备 runtime 资源和已安装的兼容性测试扩展；通过 `WALLPAPER_TEST_RUNTIME` 指定私有资源目录，默认选择其中一张已有静态图的场景，也可设置 `WALLPAPER_TEST_ID`。加 `--video` 改用自动生成的合成视频，公共 assets 仍由用户自备。测试不修改真实桌面设置。
+
+旧集成脚本需要显式设置 `WALLPAPER_TEST_SCENE_A`、`WALLPAPER_TEST_SCENE_B`、`WALLPAPER_TEST_SCENE_C` 和 `WALLPAPER_TEST_REFERENCE`，分别填写自己测试库中的条目 ID；不再内置真实素材 ID。旧脚本保留历史 runtime 布局约定，完整包验收使用上述新入口。

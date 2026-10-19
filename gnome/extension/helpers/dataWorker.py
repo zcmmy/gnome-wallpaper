@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Transactional, cancellable user resource operations. No renderer or network."""
-import argparse, ctypes, fcntl, hashlib, json, os, pathlib, shutil, signal, stat, sys, tempfile
+import argparse, fcntl, hashlib, json, os, pathlib, shutil, signal, stat, sys, tempfile
 
 class Cancelled(Exception): pass
 
 def emit(**value): print(json.dumps(value,ensure_ascii=False),flush=True)
+def sync_directory(path):
+    fd=os.open(path,os.O_RDONLY|os.O_DIRECTORY)
+    try:os.fsync(fd)
+    finally:os.close(fd)
 def atomic_json(path,value):
     tmp=path.with_name('.'+path.name+'.tmp')
     with tmp.open('w') as out:json.dump(value,out,ensure_ascii=False,indent=2);out.flush();os.fsync(out.fileno())
-    os.replace(tmp,path)
+    os.replace(tmp,path);sync_directory(path.parent)
 def inventory(folder):
     folder=pathlib.Path(folder).absolute()
     if folder.is_symlink() or not folder.is_dir():raise ValueError('请选择普通目录，不支持符号链接')
@@ -70,10 +74,8 @@ def copy_checked(source,target,files,progress):
         with dst.open('rb') as verify:
             for buf in iter(lambda:verify.read(1024*1024),b''):check.update(buf)
         if check.digest()!=digest.digest():raise ValueError('复制校验失败')
-
-def exchange(a,b):
-    libc=ctypes.CDLL(None,use_errno=True)
-    if libc.renameat2(-100,os.fsencode(a),-100,os.fsencode(b),2):raise OSError(ctypes.get_errno(),'Atomic resource exchange failed')
+        sync_directory(dst.parent)
+    for base,_,_ in os.walk(target,topdown=False):sync_directory(base)
 
 def update_index(root):
     entries=[]
@@ -100,8 +102,9 @@ def recover(root):
                 if (stage/'assets-published').exists():continue
                 # Rename old assets aside then publish. Recovery resumes this bounded gap.
                 old=stage/'previous-assets'
-                if not old.exists():os.rename(dst,old)
-            os.rename(src,dst)
+                if not old.exists():
+                    os.rename(dst,old);sync_directory(root);sync_directory(stage)
+            os.rename(src,dst);sync_directory(dst.parent);sync_directory(stage)
             if str(rel)=='assets':(stage/'assets-published').touch()
         update_index(root)
         shutil.rmtree(stage)
@@ -109,6 +112,8 @@ def recover(root):
 def run(root,request):
     root=pathlib.Path(root).absolute();root.mkdir(parents=True,exist_ok=True,mode=0o700)
     if root.is_symlink():raise ValueError('数据目录不能是符号链接')
+    for name in ['wallpapers','assets','.write.lock','library.json']:
+        if (root/name).is_symlink():raise ValueError('管理目录中存在符号链接，停止写入')
     (root/'wallpapers').mkdir(exist_ok=True)
     with (root/'.write.lock').open('a') as lock:
         try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -125,6 +130,7 @@ def run(root,request):
         sources=[];skipped=[];moves=[]
         if op in ['assets','migrate']:
             src=pathlib.Path(request['assets']).absolute()
+            if src.resolve()==root or root.is_relative_to(src.resolve()):raise ValueError('不能导入数据目录自身或上级目录')
             if (root/'assets').exists() and not request.get('replace'):
                 if op=='assets':raise ValueError('已有公共资源，替换需要确认')
                 skipped.append('assets')

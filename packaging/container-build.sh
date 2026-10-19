@@ -5,6 +5,10 @@ if [ ! -e /.dockerenv ] && [ ! -e /run/.containerenv ]; then
     echo 'Run this recipe only inside a disposable Debian 13 container.' >&2; exit 2
 fi
 cd "$(dirname "$0")/.."
+apt-get update
+apt-get install --yes --no-install-recommends python3=3.13.5-1 ca-certificates=20250419
+# Source downloads use matching Debian source indices in this disposable container.
+sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/debian.sources
 mapfile -t packages < <(python3 -c 'import json; p=json.load(open("packaging/debian13-build.lock.json")); print("\n".join(k+"="+v for k,v in p["packages"].items()))')
 apt-get update
 apt-get install --yes --no-install-recommends "${packages[@]}"

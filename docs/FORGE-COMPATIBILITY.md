@@ -62,7 +62,7 @@ runtime/forge-fix-live（使用 gnome/scripts/stage-forge-update.py，避免重�
 再在 Looking Glass 显式执行：
 
 ```javascript
-(await import('file:///home/clx/workspace/wallpaper_adapter/gnome/scripts/apply-forge-fix.js')).apply()
+(await import('file://<项目目录>/gnome/scripts/apply-forge-fix.js')).apply()
 ```
 
 迁移要求静态模式且没有截图任务，只替换窗口管理方法，不启动渲染器、不重启 Shell。
