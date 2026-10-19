@@ -48,7 +48,7 @@ python3 integration/tests/check-workspace-focus.py hot-update
 另覆盖可见应用焦点、空工作区、最小化窗口、概览返回、顶栏与 Dock、动态停止和重启。
 结果保存在本机 `reports/workspace-focus/`，不纳入 Git。
 
-验证环境为 GNOME 48 / Wayland；真实触控板手势仍需用户在当前桌面验收。
+验证环境为 GNOME 48 / Wayland；用户已在真实桌面执行会话更新并确认切换工作区不再弹窗（2026-10-19）。
 
 ## 部署与当前会话
 
