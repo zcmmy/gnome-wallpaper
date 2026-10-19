@@ -1,7 +1,7 @@
 # Git 与版本发布
 
 统一仓库：git@github.com:zcmmy/gnome-wallpaper.git
-稳定分支：main；日常开发分支：dev。当前发布基线：VERSION 中的 v0.0.1 和同名附注标签。
+稳定分支：main；日常开发分支：dev。当前发布基线：VERSION 中的 v0.0.2 和同名附注标签。
 未发布功能先进入 dev，达到发布条件并完成审查后再合并到 main；普通功能提交不代表新版本发布。
 renderer/source、gnome/extension 均是顶层仓库中的普通源码目录，不是 gitlink/submodule。
 选择完整源码快照是为了让本地补丁可随一次 clone 获得，避免引用只有开发机才有的提交。
@@ -51,3 +51,16 @@ reports/backups/runtime 各保留一份目录说明。私有资源测试需用�
 原来两个嵌套仓库的完整 Git 数据、工作区 diff、文件清单已保存在 backups/git-v0-*。
 本机 .git/upstream-backup-location 记录准确位置，不上传远端。
 还原旧仓库时应使用独立目录检出备份并应用当时 diff；不要在当前统一仓库内重新放入嵌套 .git。
+
+## 插件 Release 发布
+
+更新 VERSION、CHANGELOG、README、版本说明、PLUGIN-INSTALL 和 metadata 整数版本后运行 `make check`。
+`make release-package` 生成 `build/releases/<版本>/`，该目录须尚不存在，避免混入旧产物。
+附件为插件 ZIP、原子安装器、Markdown 安装说明和 SHA256SUMS，不包含用户资源或 C++ 后端。
+ZIP 条目固定时间与权限，同一 GLib/Python 工具链下可重复构建；不同版本 schema 编译工具可能产生不同结果。
+
+完成 dev → main 合并并创建附注标签后，推送 main、dev 和新标签。
+`.github/workflows/release.yml` 在版本标签上校验 VERSION、构建插件、验证校验和，先建立草稿并上传完整附件，再公开 Release。
+工作流只为发布任务授予仓库 contents:write 权限，使用 GitHub 自动生成的短期 token。
+失败重试只允许更新同名草稿，不覆盖已公开 Release；历史标签不移动。
+发布后核对远端分支、标签、Release 附件，并下载验证 SHA-256。
