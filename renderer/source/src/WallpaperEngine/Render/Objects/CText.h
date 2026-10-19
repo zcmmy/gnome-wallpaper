@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <memory>
 #include <vector>
 
 #include <GL/glew.h>
@@ -15,6 +16,8 @@ struct FT_LibraryRec_;
 struct FT_FaceRec_;
 typedef struct FT_LibraryRec_* FT_Library;
 typedef struct FT_FaceRec_* FT_Face;
+
+namespace WallpaperEngine::Render { class FontFallback; }
 
 namespace WallpaperEngine::Render::Wallpapers {
 class CScene;
@@ -54,6 +57,7 @@ private:
     FT_Library m_ftLibrary = nullptr;
     FT_Face m_ftFace = nullptr;
     std::vector<uint8_t> m_fontData;
+    std::unique_ptr<FontFallback> m_fonts;
 
     GLuint m_texture = 0;
     GLuint m_program = 0;

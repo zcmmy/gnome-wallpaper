@@ -1,8 +1,9 @@
 #include "CText.h"
+#include "WallpaperEngine/Render/FontFallback.h"
+#include "WallpaperEngine/Render/UnicodeText.h"
 
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
 #include <optional>
 #include <ranges>
 #include <vector>
@@ -24,17 +25,6 @@
 using namespace WallpaperEngine::Render::Objects;
 
 namespace {
-// TODO: Phase 2 - load font from wallpaper's materials/fonts/ using AssetLocator
-// Phase 1 uses a system font instead of the font shipped by the wallpaper.
-// Wallpaper Engine bundles .ttf files in `materials/fonts/`; wiring those in
-// is deferred to Phase 2 along with dynamic/scripted text.
-const std::vector<std::string> kFontCandidates = {
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/TTF/DejaVuSans.ttf",
-    "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-};
-
 const char* kVertexShader = R"glsl(
 #version 330 core
 layout(location = 0) in vec2 aPos;
@@ -101,6 +91,7 @@ CText::~CText () {
     if (m_texture != 0) {
 	glDeleteTextures (1, &m_texture);
     }
+    m_fonts.reset ();
     if (m_ftFace != nullptr) {
 	FT_Done_Face (m_ftFace);
     }
@@ -121,7 +112,8 @@ void CText::setup () {
     }
 
     m_lastPixelSize = computeEffectivePixelSize ();
-    FT_Set_Pixel_Sizes (m_ftFace, 0, static_cast<FT_UInt> (m_lastPixelSize));
+    m_fonts = std::make_unique<FontFallback> (m_ftLibrary, m_ftFace);
+    m_fonts->setPixelSize (m_lastPixelSize);
 
     buildShader ();
     // Scripted text may have an empty placeholder; use a single space so the
@@ -159,7 +151,9 @@ bool CText::loadEmbeddedFont () {
 		m_ftLibrary, m_fontData.data (), static_cast<FT_Long> (m_fontData.size ()), 0, &m_ftFace
 	    )
 	    == 0) {
-	    return true;
+	    if (FT_Select_Charmap (m_ftFace, FT_ENCODING_UNICODE) == 0) return true;
+	    FT_Done_Face (m_ftFace);
+	    m_ftFace = nullptr;
 	}
 
 	sLog.error ("CText: FT_New_Memory_Face failed for '", m_text.font, "', falling back to system font");
@@ -172,22 +166,9 @@ bool CText::loadEmbeddedFont () {
 }
 
 bool CText::loadSystemFont () {
-    std::string fontPath;
-    for (const auto& candidate : kFontCandidates) {
-	if (std::filesystem::exists (candidate)) {
-	    fontPath = candidate;
-	    break;
-	}
-    }
-    if (fontPath.empty ()) {
-	sLog.error ("CText: no usable system font found");
-	return false;
-    }
-    if (FT_New_Face (m_ftLibrary, fontPath.c_str (), 0, &m_ftFace) != 0) {
-	sLog.error ("CText: FT_New_Face failed for ", fontPath);
-	return false;
-    }
-    return true;
+    m_ftFace = FontFallback::systemFont (m_ftLibrary);
+    if (!m_ftFace) sLog.error ("CText: no usable Unicode system font found");
+    return m_ftFace != nullptr;
 }
 
 unsigned int CText::computeEffectivePixelSize () const {
@@ -198,46 +179,6 @@ unsigned int CText::computeEffectivePixelSize () const {
 
 
 namespace {
-uint32_t nextUtf8Codepoint (const std::string& text, size_t& offset) {
-    const auto lead = static_cast<uint8_t> (text[offset]);
-    int continuations;
-    uint32_t code;
-
-    if (lead < 0x80) {
-	continuations = 0;
-	code = lead;
-    } else if ((lead & 0xE0) == 0xC0) {
-	continuations = 1;
-	code = lead & 0x1Fu;
-    } else if ((lead & 0xF0) == 0xE0) {
-	continuations = 2;
-	code = lead & 0x0Fu;
-    } else if ((lead & 0xF8) == 0xF0) {
-	continuations = 3;
-	code = lead & 0x07u;
-    } else {
-	offset++;
-	return 0xFFFD;
-    }
-
-    if (offset + continuations >= text.size ()) {
-	offset++;
-	return 0xFFFD;
-    }
-
-    for (int i = 1; i <= continuations; i++) {
-	const auto cont = static_cast<uint8_t> (text[offset + i]);
-	if ((cont & 0xC0) != 0x80) {
-	    offset++;
-	    return 0xFFFD;
-	}
-	code = (code << 6) | (cont & 0x3Fu);
-    }
-
-    offset += continuations + 1;
-    return code;
-}
-
 glm::vec2 computeTextAlignmentOffset (
     const std::string& horizontalAlign, const std::string& verticalAlign, const glm::vec4& glyphBounds,
     const float ascender, const float descender, const float lineSpacing, const size_t lineCount
@@ -268,13 +209,13 @@ glm::vec2 computeTextAlignmentOffset (
 
 void CText::rebuildTextureFrom (const std::string& text) {
     // Two-pass rasterization: first measure the bounding box, then rasterize
-    // every glyph into a single grayscale bitmap. Phase 1 renders one line -
-    // multi-line wrapping, alignment, and padding come with Phase 2.
+    // every glyph into a single grayscale bitmap, using the same fallback
+    // selection for width limiting, measurement and drawing.
     //
     // Safe to call repeatedly: GL handles (texture, VAO, VBO) are reused when
     // already allocated, so dynamic/scripted text can regenerate the glyph
     // bitmap every time the rendered string changes without leaking.
-    FT_GlyphSlot slot = m_ftFace->glyph;
+    FT_GlyphSlot slot = nullptr;
 
     std::string effectiveText = text;
     if (m_text.limitwidth && m_text.maxwidth > 0.0f) {
@@ -282,7 +223,7 @@ void CText::rebuildTextureFrom (const std::string& text) {
 	    int w = 0;
 	    for (size_t offset = 0; offset < s.size ();) {
 		const auto code = static_cast<FT_ULong> (nextUtf8Codepoint (s, offset));
-		if (FT_Load_Char (m_ftFace, code, FT_LOAD_DEFAULT) == 0) {
+		if ((slot = m_fonts->load (code, FT_LOAD_DEFAULT))) {
 		    w += static_cast<int> (slot->advance.x >> 6);
 		}
 	    }
@@ -297,7 +238,7 @@ void CText::rebuildTextureFrom (const std::string& text) {
 	    for (size_t offset = 0; offset < text.size ();) {
 		const size_t sequenceStart = offset;
 		const auto code = static_cast<FT_ULong> (nextUtf8Codepoint (text, offset));
-		if (FT_Load_Char (m_ftFace, code, FT_LOAD_DEFAULT) != 0) {
+		if (!(slot = m_fonts->load (code, FT_LOAD_DEFAULT))) {
 		    continue;
 		}
 		const int adv = static_cast<int> (slot->advance.x >> 6);
@@ -312,32 +253,36 @@ void CText::rebuildTextureFrom (const std::string& text) {
     }
 
     int penX = 0;
+    int minX = 0, maxX = 0;
     int maxAscent = 0;
     int maxDescent = 0;
 
     for (size_t offset = 0; offset < effectiveText.size ();) {
 	const auto code = static_cast<FT_ULong> (nextUtf8Codepoint (effectiveText, offset));
-	if (FT_Load_Char (m_ftFace, code, FT_LOAD_RENDER) != 0) {
+	if (!(slot = m_fonts->load (code, FT_LOAD_RENDER))) {
 	    continue;
 	}
+	minX = std::min (minX, penX + slot->bitmap_left);
+	maxX = std::max (maxX, penX + slot->bitmap_left + static_cast<int> (slot->bitmap.width));
 	penX += slot->advance.x >> 6;
+	maxX = std::max (maxX, penX);
 	maxAscent = std::max (maxAscent, slot->bitmap_top);
 	maxDescent = std::max (maxDescent, static_cast<int> (slot->bitmap.rows) - slot->bitmap_top);
     }
 
-    const int width = std::max (1, penX);
+    const int width = std::max (1, maxX - minX);
     const int height = std::max (1, maxAscent + maxDescent);
     std::vector<uint8_t> pixels (static_cast<size_t> (width) * height, 0);
 
     penX = 0;
     for (size_t offset = 0; offset < effectiveText.size ();) {
 	const auto code = static_cast<FT_ULong> (nextUtf8Codepoint (effectiveText, offset));
-	if (FT_Load_Char (m_ftFace, code, FT_LOAD_RENDER) != 0) {
+	if (!(slot = m_fonts->load (code, FT_LOAD_RENDER))) {
 	    continue;
 	}
 
 	const auto& bmp = slot->bitmap;
-	const int originX = penX + slot->bitmap_left;
+	const int originX = penX + slot->bitmap_left - minX;
 	const int originY = maxAscent - slot->bitmap_top;
 
 	for (unsigned int row = 0; row < bmp.rows; ++row) {
@@ -347,7 +292,8 @@ void CText::rebuildTextureFrom (const std::string& text) {
 		if (dstX < 0 || dstX >= width || dstY < 0 || dstY >= height) {
 		    continue;
 		}
-		pixels[static_cast<size_t> (dstY) * width + dstX] = bmp.buffer[row * bmp.pitch + col];
+		auto& pixel = pixels[static_cast<size_t> (dstY) * width + dstX];
+		pixel = std::max (pixel, glyphCoverage (bmp, row, col));
 	    }
 	}
 
@@ -479,7 +425,7 @@ void CText::render () {
     const unsigned int pixelSize = computeEffectivePixelSize ();
     if (pixelSize != m_lastPixelSize) {
 	m_lastPixelSize = pixelSize;
-	FT_Set_Pixel_Sizes (m_ftFace, 0, static_cast<FT_UInt> (m_lastPixelSize));
+	m_fonts->setPixelSize (m_lastPixelSize);
 	rebuildTextureFrom (renderedText);
     } else if (renderedText != m_lastRenderedText) {
 	rebuildTextureFrom (renderedText);

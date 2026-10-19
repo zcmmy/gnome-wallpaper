@@ -7,14 +7,14 @@
 本地已验证 Debian 13 / GNOME 48 / Wayland / x86_64。
 需要 Git、CMake、Ninja、pkg-config、C++20 编译器，及以下开发库：
 OpenGL/EGL、GLFW、GLEW、GLM、SDL2、mpv、FFmpeg、PulseAudio、DBus、zlib、LZ4、FreeType、
-Wayland、wayland-protocols、X11/XRandR。部分桌面库也由 CEF 构建依赖使用。
+Wayland、wayland-protocols、X11/XRandR、Fontconfig。部分桌面库也由 CEF 构建依赖使用。
 Debian 系列可参考以下包名（按发行版调整；本仓库不自动执行安装）：
 
 ```text
 build-essential cmake ninja-build pkg-config git libgl1-mesa-dev libegl1-mesa-dev
 libglfw3-dev libglew-dev libglm-dev libsdl2-dev libmpv-dev libavcodec-dev
 libavformat-dev libavutil-dev libavdevice-dev libswscale-dev libswresample-dev
-libpulse-dev libdbus-1-dev zlib1g-dev liblz4-dev libfreetype-dev libwayland-dev
+libpulse-dev libdbus-1-dev zlib1g-dev liblz4-dev libfreetype-dev libfontconfig-dev libwayland-dev
 wayland-protocols libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 libnss3 libnspr4 libxcomposite1 libxdamage1 libasound2t64
 ```
@@ -24,6 +24,11 @@ gir1.2-adw-1、gir1.2-gdkpixbuf-2.0、libglib2.0-bin、dbus-daemon、dconf-cli�
 以 CMake 的缺包诊断为准；不要求复制开发者个人 deps/sysroot。
 CEF 版本固定于 sources.lock.json 和上游 CMake，构建时需要网络下载且占用较大空间。
 ISPC 是上游可选的纹理压缩工具依赖，普通 scene 播放不要求单独启用该工具。
+
+文字渲染使用壁纸自带字体，并通过 Fontconfig 补齐缺字。需要安装覆盖目标语言的系统字体；
+Debian 可使用 `fonts-noto-cjk` 覆盖中日韩文字。它是系统字体依赖，不随项目发布用户字体。
+多语言回归还需要 `fonts-dejavu-core`；其他发行版可用 `UNICODE_TEST_LATIN_FONT` 与
+`UNICODE_TEST_CJK_FONT` 指定等效字体路径。详见 [多语言文字](UNICODE-TEXT.md)。
 
 ## 2. 用户资源（不要提交到 Git）
 
