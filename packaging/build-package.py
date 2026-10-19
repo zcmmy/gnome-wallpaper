@@ -129,6 +129,7 @@ def build(args):
         subprocess.run(['git','-C',str(source_repo),'archive','--format=tar.gz','--output='+str(out/'renderer-corresponding-source.tar.gz'),identity['commit']],check=True)
     shutil.copy2(ROOT/'packaging/install.py',out/'install.py')
     shutil.copy2(ROOT/'docs/FULL-PACKAGE.md',out/'INSTALL.md')
+    shutil.copy2(ROOT/'docs/PACKAGING-VALIDATION.md',out/'PACKAGING-VALIDATION.md')
     shutil.copy2(ROOT/'packaging/fetch-sources.py',out/'fetch-sources.py')
     (out/'SHA256SUMS').write_text(''.join(f'{sha(p)}  {p.name}\n' for p in sorted(out.iterdir()) if p.is_file()))
     print(json.dumps({'output':str(out),'private_libraries':len(records),'host_libraries':len(host),'glibc_minimum':minimum,'archive_bytes':archive.stat().st_size}))

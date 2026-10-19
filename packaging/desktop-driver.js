@@ -66,6 +66,9 @@ export async function startTest(ext) {
         console.warn('FOCUS-DIAGNOSTIC '+JSON.stringify({events,calls}));
         if(testCase==='baseline')assert(events.length>0,'Baseline did not reproduce attention');
         else assert(events.length===0,'Workspace switch generated attention: '+JSON.stringify(events));
+        app.send_signal(10);await delay(600);assert(win.is_fullscreen(),'Test application fullscreen failed');
+        assert(ext._rendererLayer.get_parent()===Main.layoutManager._backgroundGroup,'Wallpaper escaped the background group');
+        app.send_signal(12);await delay(500);
         const playback=ext._proc, fps=ext._settings.get_int('fps');
         const request=GLib.uuid_string_random();ext._manager.runtimeCapture.start(ext._settings.get_string('selected-id'),request);
         for(let i=0;i<600&&ext._manager.runtimeCapture.job;i++)await delay(250);
@@ -87,6 +90,12 @@ export async function startTest(ext) {
             ext._rendererWindow.focus(global.get_current_time());await delay(200);
             assert(events.length===1,'Restart generated additional attention');
         }
+        app.force_exit();app=null;await delay(700);
+        assert(Main.layoutManager.panelBox.visible&&Main.layoutManager.panelBox.mapped,'Last application close hid panel');
+        assert(Main.uiGroup.get_children().filter(a=>a.name==='dashtodockContainer').every(a=>a.visible&&a.mapped),'Last application close hid Dock');
+        ext._settings.set_boolean('enabled',false);await delay(800);
+        const staticHelper=ext._staticOverview;ext.disable();
+        assert(!ext._proc&&!ext._pointerBridge&&staticHelper.dead&&!staticHelper.group,'Disable leaked runtime resources');
         GLib.file_set_contents(GLib.getenv('TEST_OUT')+'/summary.json',JSON.stringify({switchEvents,events,calls},null,2));
         console.warn('PACKAGE-TEST PASS');
     } catch(e) {console.error('PACKAGE-TEST ERROR '+e.message+' '+e.stack);}

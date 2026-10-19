@@ -17,7 +17,8 @@ def inventory(folder):
     folder=pathlib.Path(folder).absolute()
     if folder.is_symlink() or not folder.is_dir():raise ValueError('请选择普通目录，不支持符号链接')
     files=[]
-    for base,dirs,names in os.walk(folder,followlinks=False):
+    def unreadable(error):raise error
+    for base,dirs,names in os.walk(folder,followlinks=False,onerror=unreadable):
         for name in dirs+names:
             p=pathlib.Path(base)/name;mode=p.lstat().st_mode
             if stat.S_ISLNK(mode) or not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):raise ValueError('目录包含链接或特殊文件，未导入')
