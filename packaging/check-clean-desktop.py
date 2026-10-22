@@ -26,7 +26,9 @@ command=['bwrap','--bind',str(fs),'/', '--dev-bind','/dev','/dev','--proc','/pro
  '--ro-bind',str(a.extensions.resolve()),'/root/.local/share/gnome-shell/extensions',
  '--clearenv','--setenv','HOME','/root','--setenv','PATH','/usr/sbin:/usr/bin:/sbin:/bin',
  '--setenv','LANG','C.UTF-8','--chdir','/work/project',
- '/usr/bin/python3','packaging/check-desktop.py',a.archive]
+ 'dbus-run-session','--','/bin/bash','-ec',
+ 'export DBUS_SYSTEM_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS"; exec "$@"',
+ 'clean-gnome-test','/usr/bin/python3','packaging/check-desktop.py',a.archive]
 if a.video:command.append('--video')
 before=subprocess.check_output(['dconf','dump','/org/gnome/'])
 try:subprocess.run(command,check=True)

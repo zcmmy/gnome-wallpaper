@@ -3,7 +3,7 @@
 from pathlib import Path
 import os,shutil,subprocess,signal,sys,tempfile,json
 r=Path(__file__).resolve().parents[1];label='package';t=Path(tempfile.mkdtemp(prefix='wallpaper-package-test-'));bundle=Path(os.environ.get('WALLPAPER_TEST_RUNTIME',r.parent/'wallpaper-runtime'));before=subprocess.check_output(['dconf','dump','/org/gnome/']);out=r/'reports/package-desktop'/t.name;out.mkdir(parents=True,exist_ok=True)
-for n in ['data','config','cache','state','run']:(t/n).mkdir(parents=True,exist_ok=True)
+for n in ['data','config','cache','state','run','home']:(t/n).mkdir(parents=True,exist_ok=True)
 (t/'run').chmod(0o700);folder=t/'data/gnome-shell/extensions';folder.mkdir(parents=True,exist_ok=True)
 for n in ['wallpaperengine@waylandwe','forge@jmmaranan.com','blur-my-shell@aunetx','dash-to-dock@micxgx.gmail.com','rounded-windows@marcosgt.github.io']:
  if n.startswith('wallpaper'):
@@ -32,7 +32,7 @@ env={k:v for k,v in os.environ.items() if not k.startswith(('LWE_','GSETTINGS_')
 for k in ['DISPLAY','WAYLAND_DISPLAY','WAYLAND_SOCKET','DBUS_SESSION_BUS_ADDRESS','GI_TYPELIB_PATH','LD_LIBRARY_PATH']:env.pop(k,None)
 for k,n in [('XDG_RUNTIME_DIR','run'),('XDG_CONFIG_HOME','config'),('XDG_DATA_HOME','data'),('XDG_CACHE_HOME','cache'),('XDG_STATE_HOME','state')]:env[k]=str(t/n)
 (t/'output').mkdir()
-env.update(TEST_SCENE=scene,TEST_CASE=label,WALLPAPER_BUNDLE=str(bundle),GDK_BACKEND='wayland',TEST_PROFILE=str(t),TEST_OUT=str(t/'output'),GSETTINGS_SCHEMA_DIR=str(ext/'schemas'),GIO_USE_VFS='local',GVFS_DISABLE_FUSE='1')
+env.update(HOME=str(t/'home'),XDG_SESSION_TYPE='wayland',TEST_SCENE=scene,TEST_CASE=label,WALLPAPER_BUNDLE=str(bundle),GDK_BACKEND='wayland',TEST_PROFILE=str(t),TEST_OUT=str(t/'output'),GSETTINGS_SCHEMA_DIR=str(ext/'schemas'),GIO_USE_VFS='local',GVFS_DISABLE_FUSE='1')
 data=t/'data/gnome-wallpaper'
 for request in [{'operation':'assets','assets':str(bundle/'assets')},{'operation':'import','source':str(fixture if video else bundle/'wallpapers'/scene)}]:
  with (out/'import.log').open('a') as log:

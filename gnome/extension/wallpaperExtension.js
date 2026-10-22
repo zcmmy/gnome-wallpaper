@@ -763,7 +763,7 @@ export default class WallpaperEngineExtension extends Extension {
         this._pointerBridge = new PointerBridge(this._socketPath, () => {
             const [x, y, mask] = global.get_pointer();
             const geo = this._targetGeometry();
-            const active = !this._paused && !Main.overview.visible && !Main.screenShield.locked &&
+            const active = !this._paused && !Main.overview.visible && !Main.screenShield?.locked &&
                 x >= geo.x && y >= geo.y && x < geo.x + geo.width && y < geo.y + geo.height;
             // Track motion across the desktop, but never forward clicks on apps,
             // panel controls or the Dock into the wallpaper.

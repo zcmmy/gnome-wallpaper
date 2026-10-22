@@ -32,6 +32,8 @@ export async function startTest(ext) {
         ext._settings.set_boolean('enabled',true);
         for(let i=0;i<100&&!ext._rendererReady;i++)await delay(150);
         assert(ext._rendererReady,'Renderer missing');await delay(700);
+        const pointerId=ext._pointerBridge?._id;await delay(400);
+        assert(pointerId>0&&ext._pointerBridge?._id>pointerId,'Pointer IPC stalled');
         if(testCase==='hot-update'){
             const proc=ext._proc,fps=ext._settings.get_int('fps');
             const update=await import('./applyFocusTest.js');update.apply();update.apply();
