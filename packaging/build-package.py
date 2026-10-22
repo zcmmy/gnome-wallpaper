@@ -13,6 +13,19 @@ def sha(p):
         for b in iter(lambda:f.read(1048576),b''):h.update(b)
     return h.hexdigest()
 def run(*args,**kw):return subprocess.check_output(args,text=True,**kw).strip()
+def check_source_snapshot(repo):
+    forbidden={'assets','wallpapers','wallpaper','deps','build','dist','logs'}
+    entries=run('git','-C',str(repo),'ls-tree','-r','HEAD').splitlines()
+    for entry in entries:
+        info,name=entry.split('\t',1)
+        if name.split('/')[0] in forbidden or name.startswith('docs/internal/'):
+            raise ValueError('Private/generated path in source snapshot: '+name)
+        if info.startswith('120000'):
+            target=run('git','-C',str(repo),'show','HEAD:'+name)
+            normalized=os.path.normpath(str(pathlib.PurePosixPath(name).parent/target))
+            if pathlib.PurePosixPath(target).is_absolute() or normalized=='..' or normalized.startswith('../'):
+                raise ValueError('Machine-specific or escaping source symlink: '+name)
+
 def source_identity(output):
     cache=(output.parent/'CMakeCache.txt').read_text()
     home=pathlib.Path(re.search(r'^CMAKE_HOME_DIRECTORY:INTERNAL=(.+)$',cache,re.M)[1])
@@ -51,6 +64,7 @@ def build(args):
     libraries={n:pathlib.Path(p).resolve() for n,p in re.findall(r'^\s*(\S+) => (\S+) \(',linked,re.M)}
     out=args.output.absolute();out.mkdir(parents=True,exist_ok=False)
     identity=source_identity(output);source_repo=identity.pop('source_root')
+    check_source_snapshot(source_repo)
     identity['cmake_flags']={k:v.replace(str(source_repo),'<SOURCE>').replace(str((ROOT/'deps').resolve()),'<DEPS>') for k,v in identity['cmake_flags'].items()}
     if run('git','-C',str(source_repo),'status','--porcelain','--','renderer/source'):
         raise ValueError('Commit renderer sources before archiving corresponding source')

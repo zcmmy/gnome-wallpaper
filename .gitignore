@@ -2,7 +2,7 @@
 /assets/
 /wallpapers/
 /wallpaper/
-/deps/
+/deps
 /build/
 /runtime/*
 !/runtime/README.md

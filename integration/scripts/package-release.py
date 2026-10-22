@@ -9,6 +9,9 @@ version=(root/'VERSION').read_text().strip();out=pathlib.Path(sys.argv[1]).absol
 build=pathlib.Path(os.environ.get('WALLPAPER_BUILD_DIR',root/'build/package-renderer'))
 subprocess.run([sys.executable,str(root/'packaging/build-package.py'),'--build-dir',str(build),'--output',str(out)],check=True)
 manifest=json.loads((out/'backend-manifest.json').read_text());index=json.loads(source_index.read_text())
+sys.path.insert(0,str(root/'packaging'))
+from verify_sources import verify
+print('Verified corresponding sources:',verify(manifest,source_dir))
 required={(r['source_package'],r['source_version']) for r in manifest['libraries']+manifest.get('source_inputs',[]) if 'source_package' in r}
 if not required<={tuple(p) for p in index['packages']}:raise SystemExit('Dependency sources do not match the binary manifest')
 for name,digest in index['files'].items():

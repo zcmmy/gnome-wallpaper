@@ -51,6 +51,8 @@ clean-tests-apply:
 check-packaging:
 	python3 packaging/test-data.py
 	python3 packaging/test-install.py
+	python3 packaging/test-sources.py
+	python3 packaging/test-source-snapshot.py
 
 package-backend:
 	bash packaging/build-backend.sh
