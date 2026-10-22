@@ -40,7 +40,7 @@ python3 packaging/check-clean-desktop.py /独立/rootfs \
 增加 `--video` 可测试自建合成视频。资源目录包含 `assets/`、`wallpapers/`，仅用于私有验收，不进入发行包。
 工具在 rootfs 内运行 GNOME、GJS、GTK、安装器及完整包；只读挂载测试资源和用于兼容验证的扩展代码。
 实际图形阶段再次隐藏源码、构建、旧 runtime，安装后的程序目录只读。
-独立 XDG 和 DBus 隔离设置、日志与进程；检查前后比较宿主 GNOME 设置。
+独立 HOME、XDG、会话与系统 DBus 隔离设置、日志与进程；为无系统登录服务的测试用户提供 passwd 记录，并明确设置 Wayland 会话标识。检查前后比较宿主 GNOME 设置。
 
 检查包括静态应用列表、管理界面、动态播放、独立高质量截图、工作区、全屏、焦点通知、空工作区和回收。
 rootfs 与宿主共享内核和 GPU 设备，所用 Mesa 用户态库来自 rootfs；这不是独立虚拟机或另一种显卡的兼容认证。
