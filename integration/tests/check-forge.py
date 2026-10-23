@@ -24,7 +24,7 @@ script='''for name in forge blur-my-shell dash-to-dock rounded-windows; do
 done
 s=org.gnome.shell.extensions.wallpaperengine
 gsettings set "$s" library-root "$WALLPAPER_BUNDLE/wallpapers"
-gsettings set "$s" selected-id '2835142671'
+gsettings set "$s" selected-id "$WALLPAPER_TEST_SCENE_A"
 gsettings set "$s" assets-path "$WALLPAPER_BUNDLE/assets"
 gsettings set "$s" wallpaperengine-path "$WALLPAPER_BUNDLE/bin/renderer"
 gsettings set "$s" enabled false

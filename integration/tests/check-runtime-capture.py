@@ -6,7 +6,7 @@ r=Path(__file__).resolve().parents[2];t=r/'runtime/runtime-capture-test';out=r/'
 out.mkdir(parents=True,exist_ok=True)
 ext=t/'data/gnome-shell/extensions/wallpaperengine@waylandwe'
 shutil.copytree(r/'gnome/extension',ext,dirs_exist_ok=True,ignore=shutil.ignore_patterns('.git','__pycache__'))
-for ident in ['2835142671','3668592696']:
+for ident in [os.environ['WALLPAPER_TEST_SCENE_A'],os.environ['WALLPAPER_TEST_SCENE_C']]:
  shutil.copytree(r/'wallpapers'/ident,t/'wallpapers'/ident,dirs_exist_ok=True)
 shutil.copy2(r/'integration/tests/runtime-capture-driver.js',ext/'runtimeCaptureTest.js')
 p=ext/'wallpaperExtension.js';s=p.read_text()+"\nimport {startTest} from './runtimeCaptureTest.js';\n";s=s.replace('        this._manager.start();','        this._manager.start();\n        GLib.idle_add(GLib.PRIORITY_DEFAULT,()=>{startTest(this);return GLib.SOURCE_REMOVE;});');p.write_text(s)

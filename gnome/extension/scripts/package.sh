@@ -11,6 +11,7 @@ cp "$extension_root/../../LICENSE" "$extension_root/../../NOTICE.md" "$extension
 cp "$extension_root"/captureWorker.py "$extension_root"/libraryWorker.py "$stage/"
 cp "$extension_root"/*.js "$extension_root/metadata.json" "$stage/"
 cp "$extension_root"/schemas/*.gschema.xml "$stage/schemas/"
+cp -r "$extension_root/common" "$extension_root/helpers" "$stage/"
 glib-compile-schemas --strict "$stage/schemas"
 python3 - "$stage" "$output_zip" <<'ARCHIVE'
 from pathlib import Path

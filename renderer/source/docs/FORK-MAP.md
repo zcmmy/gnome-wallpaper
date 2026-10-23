@@ -1,5 +1,12 @@
 # Fork capability map
 
+> **Upstream reference, not current distribution instructions.** This document is
+> retained from portghost baseline `50530e5167c0822e63f052f50ef8d8613663915a`.
+> Its paths describe that upstream tree; `lwe-ui` and its installer are no longer
+> bundled. UI chapters and performance claims describe the upstream system only.
+> See the [pinned original](https://github.com/portghost-dev/linux-wallpaperengine/blob/50530e5167c0822e63f052f50ef8d8613663915a/docs/FORK-MAP.md) for removed paths and the
+> GNOME Wallpaper top-level documentation for the current integration.
+
 **What this is.** A complete, code-grounded map of everything this fork adds or changes
 relative to upstream [Almamu/linux-wallpaperengine](https://github.com/Almamu/linux-wallpaperengine)
 at base commit `b016d7d`. It exists so that upstream maintainers and other developers can

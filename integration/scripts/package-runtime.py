@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Create a relocatable scene runtime for the current Linux host; never install it."""
 import argparse, hashlib, json, os, pathlib, re, shutil, subprocess, tempfile
+from runtime_notices import collect_notices
 p=argparse.ArgumentParser(); p.add_argument('destination',type=pathlib.Path);a=p.parse_args()
 r=pathlib.Path(__file__).resolve().parents[2]
 d=a.destination.absolute()
@@ -24,6 +25,8 @@ d.parent.mkdir(parents=True,exist_ok=True)
 stage=pathlib.Path(tempfile.mkdtemp(prefix='.wallpaper-runtime-',dir=d.parent))
 try:
  for name in ['bin','libexec','lib','gnome','licenses']: (stage/name).mkdir()
+ # Include source/embedded-code notices as well as the actual private library notices.
+ collect_notices(r, local, source, stage/'licenses', libs)
  shutil.copy2(source/'linux-wallpaperengine',stage/'libexec/linux-wallpaperengine')
  for name,path in libs.items():shutil.copy2(path,stage/'lib'/name)
  shutil.copytree(r/'assets',stage/'assets',symlinks=False)
@@ -38,11 +41,6 @@ try:
  for name in ['LICENSE','NOTICE.md']:
   shutil.copy2(r/name,stage/name)
   shutil.copy2(r/name,ext/name)
- # Keep license notices for the private libraries copied from the local sysroot.
- owners={'libGLEW.so.2.2':'libglew2.2','libmpv.so.2':'libmpv2','libglfw.so.3':'libglfw3','libmujs.so.3':'libmujs3','libavdevice.so.61':'libavdevice61','liblua5.2.so.0':'liblua5.2-0','libjack.so.0':'libjack0','libsndio.so.7':'libsndio7.0','libsixel.so.1':'libsixel1','libXpresent.so.1':'libxpresent1','libva-wayland.so.2':'libva-wayland2','libexpat.so.1':'libexpat1'}
- for soname,owner in owners.items():
-  notice=local/'share/doc'/owner/'copyright'
-  if soname in libs and notice.exists():shutil.copy2(notice,stage/'licenses'/f'{owner}-copyright')
  write(stage/'bin/renderer','''#!/bin/bash
 set -euo pipefail
 root="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"

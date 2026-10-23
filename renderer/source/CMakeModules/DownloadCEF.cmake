@@ -1,6 +1,6 @@
 # Copyright (c) 2016 The Chromium Embedded Framework Authors. All rights
 # reserved. Use of this source code is governed by a BSD-style license that
-# can be found in the LICENSE file.
+# can be found in the accompanying LICENSE-CEF file.
 
 # Download the CEF binary distribution for |platform| and |version| to
 # |download_dir|. The |CEF_ROOT| variable will be set in global scope pointing

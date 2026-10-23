@@ -10,7 +10,7 @@ export async function startTest(ext) {
  const out=GLib.getenv('WALLPAPER_TEST_ROOT')+'/reports/hq-recapture/';const results=[];
  try {
   await delay(2000);Main.overview.hide();
-  for(const id of ['2835142671','3668592696']) {
+  for(const id of [GLib.getenv('WALLPAPER_TEST_SCENE_A'),GLib.getenv('WALLPAPER_TEST_SCENE_C')]) {
    ext._settings.set_boolean('enabled',false);await wait(()=>!ext._proc);
    ext._settings.set_string('selected-id',id);ext._settings.set_boolean('enabled',true);
    await wait(()=>ext._rendererReady);await delay(1200);

@@ -1,0 +1,17 @@
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import {paths,initializePaths,readJson,backendStatus,thumbnailPath,privateRuntimeDirectory} from '../gnome/extension/common/paths.js';
+const assert=(v,m)=>{if(!v)throw new Error(m);};
+const settings=new Gio.Settings({schema_id:'org.gnome.shell.extensions.wallpaperengine'});
+settings.set_string('library-root','/legacy/library');settings.set_string('assets-path','/legacy/assets');settings.set_int('fps',24);settings.set_boolean('rotation-enabled',true);
+initializePaths(settings);initializePaths(settings);
+assert(settings.get_string('library-root')===paths.library,'managed library path');
+assert(settings.get_string('wallpaperengine-path')===paths.renderer,'packaged backend path');
+assert(settings.get_int('fps')===24&&settings.get_boolean('rotation-enabled'),'preferences reset');
+assert(readJson(paths.state+'/legacy-settings.json')['library-root']==='/legacy/library','legacy snapshot overwritten');
+assert(thumbnailPath(paths.library+'/中文 空格').startsWith(paths.cache+'/'),'thumbnail written into resources');
+assert(!backendStatus().ready,'source checkout claimed complete backend');
+GLib.file_set_contents(paths.data+'/library.json','{"version":100}');
+let rejected=false;try{initializePaths(settings);}catch(_){rejected=true;}assert(rejected,'newer data format accepted');
+const runtime=Gio.File.new_for_path(privateRuntimeDirectory());assert((runtime.query_info('unix::mode',0,null).get_attribute_uint32('unix::mode')&0o777)===0o700,'runtime directory permissions');runtime.delete(null);
+print('PASS: managed XDG paths, legacy snapshot, settings retention, cache separation, incompatible index');

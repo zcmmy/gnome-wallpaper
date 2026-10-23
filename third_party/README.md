@@ -10,11 +10,12 @@
 | 仓库 | [portghost-dev/linux-wallpaperengine](https://github.com/portghost-dev/linux-wallpaperengine) |
 | 固定基线 | [`50530e5167c0822e63f052f50ef8d8613663915a`](https://github.com/portghost-dev/linux-wallpaperengine/tree/50530e5167c0822e63f052f50ef8d8613663915a) |
 | 本地源码 | [renderer/source](../renderer/source) |
-| 上游说明 | [保留的 README](../renderer/source/README.md)、[架构](../renderer/source/ARCHITECTURE.md) |
+| 上游说明 | [下游范围与原始 README 引用](../renderer/source/README.md)、[架构](../renderer/source/ARCHITECTURE.md) |
 | 许可证 | [原始 GPLv3 全文](../renderer/source/LICENSE)；[Arch 配置](../renderer/source/packaging/archlinux/PKGBUILD) 标注 `GPL-3.0-only` |
 | 来源记录 | [sources.lock.json](sources.lock.json)、[v0 初始修改索引](local-changes-v0.json) |
 
-我们以完整源码快照保存该基线与本地修改，避免引用开发机独有的 submodule 提交。
+我们以纳入顶层 Git 的渲染器源码保存该基线与本地修改，避免引用开发机独有的 submodule 提交。
+当前快照已裁剪未使用的 UI 与演示资源；固定 commit/tree 仍记录原始导入基线，不伪称为裁剪后树的哈希。
 锁文件中的 commit 是**上游基线**，实际集成版本由顶层 Git 提交标识；不能把修改后源码称为未经修改的上游版本。
 
 ### 上游提供的能力
@@ -52,7 +53,13 @@ GNU 的[GPLv3 指南](https://www.gnu.org/licenses/quick-guide-gplv3.html)说明
 [External](../renderer/source/src/External) 中的 Catch2、argparse、MimeTypes、ISPCTextureCompressor、
 kissfft、SPIRV-Cross-WallpaperEngine、json、quickjs、stb 和 glslang-WallpaperEngine 随 renderer 基线固定。
 它们保留各自许可；[licenses.json](licenses.json) 索引这些文件，不能统一改写为 GPL。
-上游 `lwe-ui` 控制面板按 [pyproject.toml](../renderer/source/lwe-ui/pyproject.toml) 单独使用 MIT；本项目管理 UI 位于 `gnome/extension/`。
+未使用的上游 `lwe-ui`、其测试（含 40 个 `.lwebackup` 夹具）、7 张演示图片/动图及专用 `install.sh` 已移除。
+其原始 [MIT 声明](https://github.com/portghost-dev/linux-wallpaperengine/blob/50530e5167c0822e63f052f50ef8d8613663915a/lwe-ui/pyproject.toml) 仅作为历史来源；本项目管理 UI 位于 `gnome/extension/`。
+C++ 测试实际使用的一份帮助输出文本已移到 renderer 测试目录；内容与 GPL 渲染器中的字符串一致。
+External 依赖的测试、许可证和自建合成校准工具保留，不把它们误认为用户壁纸资源。
+历史 `v0` 修改索引、标签和提交保持原状，不代表当前文件清单。
+
+额外归属、构建脚本许可和头文件/协议许可见 [组件说明](COMPONENT-NOTICES.md)。
 
 CEF 固定版本和下载入口见锁文件，构建时按上游 CMake 下载；系统 OpenGL、GLFW、FFmpeg、mpv、GNOME 等由发行版提供。
 系统库不由上游 commit 锁定。安装需求见 [INSTALL.md](../docs/INSTALL.md)。

@@ -1,5 +1,12 @@
 # Architecture
 
+> **Upstream reference, not current distribution instructions.** This document is
+> retained from portghost baseline `50530e5167c0822e63f052f50ef8d8613663915a`.
+> Its paths describe that upstream tree; `lwe-ui` and its installer are no longer
+> bundled. UI chapters and performance claims describe the upstream system only.
+> See the [pinned original](https://github.com/portghost-dev/linux-wallpaperengine/blob/50530e5167c0822e63f052f50ef8d8613663915a/ARCHITECTURE.md) for removed paths and the
+> GNOME Wallpaper top-level documentation for the current integration.
+
 **Audience.** A developer who knows upstream linux-wallpaperengine (or C++ graphics
 code generally) and wants to understand this fork: what it does differently, why those
 choices were made, how the pieces fit, and where the code is. Read top to bottom once;

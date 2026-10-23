@@ -4,7 +4,12 @@ source "$(dirname "$(readlink -f "$0")")/../scripts/env.sh"
 source_dir="$WALLPAPER_ROOT/renderer/source/src"
 renderer_output="${WALLPAPER_BUILD_DIR:-$WALLPAPER_ROOT/build/renderer}/output"
 if [ -z "${WALLPAPER_BUILD_DIR:-}" ] && [ ! -f "$renderer_output/liblinux-wallpaperengine-lib.so" ]; then
-    renderer_output="$WALLPAPER_ROOT/build/portghost/output"
+    for candidate in package-renderer portghost; do
+        if [ -f "$WALLPAPER_ROOT/build/$candidate/output/liblinux-wallpaperengine-lib.so" ]; then
+            renderer_output="$WALLPAPER_ROOT/build/$candidate/output"
+            break
+        fi
+    done
 fi
 test_dir="$(mktemp -d)"
 trap 'rm -rf "$test_dir"' EXIT

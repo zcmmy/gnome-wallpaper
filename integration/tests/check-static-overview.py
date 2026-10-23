@@ -16,7 +16,7 @@ dconf load /org/gnome/shell/extensions/dash-to-dock/ < "$TEST_PROFILE/dash-to-do
 s=org.gnome.shell.extensions.wallpaperengine
 gsettings reset-recursively "$s"
 gsettings set "$s" library-root "$WALLPAPER_TEST_ROOT/wallpapers"
-gsettings set "$s" selected-id '3721991999'
+gsettings set "$s" selected-id "$WALLPAPER_TEST_REFERENCE"
 gsettings set "$s" assets-path "$WALLPAPER_TEST_ROOT/assets"
 gsettings set "$s" wallpaperengine-path "$WALLPAPER_TEST_ROOT/renderer/scripts/run.sh"
 gsettings set org.gnome.shell enabled-extensions '["dash-to-dock@micxgx.gmail.com", "blur-my-shell@aunetx", "wallpaperengine@waylandwe"]'

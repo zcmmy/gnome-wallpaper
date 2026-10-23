@@ -9,6 +9,7 @@ import Meta from 'gi://Meta';
 import Clutter from 'gi://Clutter';
 import {holdCompositing, releaseCompositing} from './compositingGuard.js';
 import {restoreWorkspaceFocus} from './windowFocus.js';
+import {initializePaths, backendStatus, assetsReady, paths, privateRuntimeDirectory} from './common/paths.js';
 import {PointerBridge} from './pointerBridge.js';
 import {OverviewWallpaper} from './overviewWallpaper.js';
 import {StaticOverview} from './staticOverview.js';
@@ -24,7 +25,7 @@ const MPV_APP_ID = 'gwe-mpv-renderer';
 
 // Bumped on every code change; logged from enable() so we can tell which
 // revision the running shell actually loaded (see the comment there).
-const CODE_REVISION = 15;
+const CODE_REVISION = 16;
 
 const SIGTERM = 15;
 const SIGCONT = 18;
@@ -48,13 +49,14 @@ function expandTilde(path) {
 export default class WallpaperEngineExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
+        initializePaths(this._settings);
         // Dynamic intent persists across switches and screen lock, but never
         // launches on a new login without a fresh explicit UI action.
         if (!this._everEnabled) {this._settings.set_boolean('enabled', false); this._everEnabled = true;}
         this._destroyed = false;
         this._restartPending = false;
         this._pointerBridge = null;
-        this._socketDir = GLib.dir_make_tmp('wallpaper-adapter-XXXXXX');
+        this._socketDir = privateRuntimeDirectory();
         this._socketPath = GLib.build_filenamev([this._socketDir, 'renderer.sock']);
 
         this._proc = null;
@@ -249,6 +251,8 @@ export default class WallpaperEngineExtension extends Extension {
     }
 
     _buildWallpaperEngineArgv() {
+        const status = backendStatus();
+        if (!status.ready || !assetsReady()) {this._notifyError(status.error || '请先在设置中导入公共 assets'); return null;}
         const scene = this._resolveScenePath();
         if (scene === null) {
             this._notifyError(
@@ -358,7 +362,7 @@ export default class WallpaperEngineExtension extends Extension {
         try {
             const launcher = new Gio.SubprocessLauncher({flags: Gio.SubprocessFlags.NONE});
             launcher.setenv('LWE_SOCKET', this._socketPath, true);
-            const logDir = GLib.build_filenamev([GLib.get_user_state_dir(), 'wallpaper-adapter']);
+            const logDir = paths.state;
             GLib.mkdir_with_parents(logDir, 0o700);
             launcher.set_stdout_file_path(GLib.build_filenamev([logDir, 'renderer.log']));
             launcher.set_stderr_file_path(GLib.build_filenamev([logDir, 'renderer-error.log']));
@@ -759,7 +763,7 @@ export default class WallpaperEngineExtension extends Extension {
         this._pointerBridge = new PointerBridge(this._socketPath, () => {
             const [x, y, mask] = global.get_pointer();
             const geo = this._targetGeometry();
-            const active = !this._paused && !Main.overview.visible && !Main.screenShield.locked &&
+            const active = !this._paused && !Main.overview.visible && !Main.screenShield?.locked &&
                 x >= geo.x && y >= geo.y && x < geo.x + geo.width && y < geo.y + geo.height;
             // Track motion across the desktop, but never forward clicks on apps,
             // panel controls or the Dock into the wallpaper.

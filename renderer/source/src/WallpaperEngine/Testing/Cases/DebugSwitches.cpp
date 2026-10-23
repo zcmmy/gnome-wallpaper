@@ -222,7 +222,7 @@ TEST_CASE ("helpText starts with the unsupported notice and has an entry for eve
 	CHECK_THAT (text, ContainsSubstring ("\n  " + row.name + " <"));
     }
 
-    std::ifstream file (LWE_SOURCE_DIR "/lwe-ui/tests/fixtures/help/engine-debug.txt", std::ios::binary);
+    std::ifstream file (LWE_SOURCE_DIR "/src/WallpaperEngine/Testing/Fixtures/engine-debug.txt", std::ios::binary);
     REQUIRE (file.is_open ());
     const std::string fixture { std::istreambuf_iterator<char> (file), std::istreambuf_iterator<char> () };
     CHECK (text == fixture);

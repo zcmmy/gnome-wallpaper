@@ -5,7 +5,7 @@ import GdkPixbuf from 'gi://GdkPixbuf';
 
 const KEYS = ['picture-uri', 'picture-uri-dark', 'picture-options'];
 const backupPath = () => GLib.build_filenamev([
-    GLib.get_user_state_dir(), 'wallpaper-adapter', 'original-background.json']);
+    GLib.get_user_state_dir(), 'gnome-wallpaper', 'original-background.json']);
 
 export function applyStaticWallpaper(scene, scaling = 'fill') {
     if (!scene || !GLib.path_is_absolute(scene)) return false;

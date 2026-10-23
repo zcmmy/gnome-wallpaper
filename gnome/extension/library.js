@@ -1,6 +1,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GdkPixbuf from 'gi://GdkPixbuf';
+import {thumbnailPath, paths, readJson} from './common/paths.js';
 
 export function imageInfo(path) {
     try { const [format, width, height] = GdkPixbuf.Pixbuf.get_file_info(path);
@@ -33,7 +34,7 @@ export function readLibrary(root) {
                 const still = path + '/static-background.png';
                 const preview = typeof data.preview === 'string' && !/[\\/]/.test(data.preview) ? path + '/' + data.preview : null;
                 entries.push({id, path, title:String(data.title || id), type, still,
-                    thumbnail:path + '/thumbnail.jpg', preview, ready:!!imageInfo(still),
+                    thumbnail:thumbnailPath(path), preview, ready:!!imageInfo(still),
                     warning:typeof note.renderWarning === 'string' ? note.renderWarning : '', supported:['scene','video'].includes(type)});
             } catch (_) { /* A partial download is not a library entry. */ }
         }
@@ -42,12 +43,15 @@ export function readLibrary(root) {
 }
 export function writeThumbnail(path) {
     const pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path + '/static-background.png', 480, 270, true);
-    const tmp = path + '/.thumbnail-' + GLib.uuid_string_random() + '.jpg';
+    const target=thumbnailPath(path);
+    const tmp = target + '.' + GLib.uuid_string_random() + '.tmp';
     pixbuf.savev(tmp, 'jpeg', ['quality'], ['85']);
-    Gio.File.new_for_path(tmp).move(Gio.File.new_for_path(path + '/thumbnail.jpg'), Gio.FileCopyFlags.OVERWRITE, null, null);
+    Gio.File.new_for_path(tmp).move(Gio.File.new_for_path(target), Gio.FileCopyFlags.OVERWRITE, null, null);
 }
 // Called only by an explicit image-picker action in the preferences process.
 export function replaceStaticImage(path, source) {
+    if (path.startsWith(paths.library+'/') && Gio.File.new_for_path(paths.data+'/library.json').query_exists(null) && readJson(paths.data+'/library.json').version!==1)
+        throw new Error('图库版本不兼容，未修改静态图片');
     const pixbuf = GdkPixbuf.Pixbuf.new_from_file(source);
     const tmp = path + '/.static-' + GLib.uuid_string_random() + '.png';
     const dest = Gio.File.new_for_path(path + '/static-background.png');

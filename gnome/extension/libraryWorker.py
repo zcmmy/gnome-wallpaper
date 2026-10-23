@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Short-lived file operations; never starts a wallpaper renderer."""
-import ctypes,json,os,pathlib,shutil,sys,tempfile
+import ctypes,fcntl,json,os,pathlib,shutil,sys,tempfile
 
 def validate(folder):
     if folder.is_symlink() or not folder.is_dir():raise ValueError('请选择普通壁纸目录，不支持符号链接')
@@ -64,7 +64,14 @@ if __name__=='__main__':
         root=pathlib.Path(library)
         if not root.is_absolute() or not root.is_dir():raise ValueError('壁纸库目录不存在')
         root=root.resolve()
+        lock=(root.parent/'.write.lock').open('a')
+        try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError:raise ValueError('其他资源任务正在运行，请稍后重试')
+        index=root.parent/'library.json'
+        if index.exists() and json.loads(index.read_text()).get('version')!=1:raise ValueError('图库版本不兼容，停止写入')
         result=import_wallpapers(root,value) if operation=='import' else trash_wallpaper(root,value) if operation=='delete' else None
         if result is None:raise ValueError('未知操作')
+        if index.exists():
+            tmp=index.with_suffix('.json.tmp');tmp.write_text(json.dumps({'version':1,'entries':sorted(p.name for p in root.iterdir() if p.is_dir() and (p/'project.json').is_file())}));os.replace(tmp,index)
         print(json.dumps(result,ensure_ascii=False))
     except Exception as error:print(json.dumps({'error':str(error)},ensure_ascii=False));sys.exit(1)
