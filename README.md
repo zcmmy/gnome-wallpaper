@@ -1,100 +1,113 @@
-# GNOME Wallpaper — v0.0.3
+# GNOME Wallpaper — v0.1.0
 
-GNOME Wayland 上的 Wallpaper Engine 场景/视频壁纸管理器。
-使用独立的 portghost C++ 渲染器和 GNOME Shell 插件，支持静态优先、显式动态播放。
-项目：[zcmmy/gnome-wallpaper](https://github.com/zcmmy/gnome-wallpaper)
+GNOME Wayland 上的 Wallpaper Engine 场景和视频壁纸管理器，使用独立的 portghost C++ 渲染器。
+**v0.1.0 提供完整预编译安装包**：后端、必要私有库、GNOME 插件及管理界面一起安装，用户通过界面导入自己的 assets 和壁纸。
 
-## 功能
+验证平台：**Debian 13 / GNOME 48 / Wayland / x86_64**。预编译安装器按此平台检查，不是跨发行版通用二进制。
+项目不提供任何壁纸、Wallpaper Engine assets、用户截图或素材下载信息。
 
-- 静态缩略图与大图预览，导入壁纸、移入回收站删除和切换壁纸。
-- 选择壁纸后先应用其静态图；只有明确开启动态模式才启动渲染器。
-- 动态开关跨壁纸延续；全局帧率上限默认 15 FPS。
-- 支持动画、频谱与鼠标交互，具体兼容性取决于壁纸效果。
-- 默认关闭轮换；开启后默认每 30 分钟切换，支持顺序或可恢复的伪随机序列。
-- 支持用户提供 static-background.png；缺图时明确开启动态可触发一次性辅助截图。
-- 动态播放时可手动截图并替换静态图：后台独立生成 4K 场景截图并缩小至 1080p，同步缩略图和原生背景，播放继续。
-- 场景截图按 4K 可见区域渲染、缩小为 1080p；视频使用原生解码帧。
-- 静态/动态壁纸兼容桌面和应用列表背景；不改变顶栏、Dock 的尺寸或样式。
+## 通过安装包安装
 
-Forge 平铺兼容性、原因与测试：[docs/FORGE-COMPATIBILITY.md](docs/FORGE-COMPATIBILITY.md)。
+从 [v0.1.0 Release](https://github.com/zcmmy/gnome-wallpaper/releases/tag/v0.1.0) 下载以下三个文件到同一目录：
 
-## 验证范围与限制
+- `gnome-wallpaper-v0.1.0-linux-x86_64.shell-extension.zip`
+- `install.py`
+- `SHA256SUMS`
 
-当前本地验证平台为 Debian 13、GNOME 48、Wayland、x86_64。
-上游 metadata 声明 GNOME 45–50，并不代表本项目已在这些版本全部验证。
-当前运行包以 scene/video 为目标；不包含完整的 CEF Web 壁纸运行依赖。
-静态模式不启动渲染器、音频采集或鼠标桥；轮换开启时保留必要的调度。
-高质量截图会有短暂额外负载，任务结束即退出，不改变普通动态播放设置。
-不提供自动登录启动脚本；手动启用 GNOME 扩展本身可能在后续登录恢复启用状态。
-
-## 获取、构建、安装
-
-当前源码为 **v0.0.3**，包含多语言文字与工作区焦点修复；本版本未发布 Release 安装包。
-已发布的安装包仍为 [v0.0.2 插件安装包](https://github.com/zcmmy/gnome-wallpaper/releases/tag/v0.0.2)，
-按 [插件安装说明](docs/PLUGIN-INSTALL.md) 安装或更新。插件 ZIP 不包含 C++ 渲染器和用户素材。
-
+在下载目录执行：
 
 ```bash
-git clone git@github.com:zcmmy/gnome-wallpaper.git
+sha256sum --check --ignore-missing SHA256SUMS
+python3 install.py ./gnome-wallpaper-v0.1.0-linux-x86_64.shell-extension.zip
+```
+
+安装器校验平台、依赖和包完整性，在暂存目录准备后原子安装；升级时停止本插件的播放/截图并保留旧程序供回滚。
+无需编译、手动解压、部署 runtime 或填写后端路径。不要直接解压覆盖活动插件目录。
+系统仍需 GNOME、图形驱动、GJS、Python/PyGObject、GTK4、Libadwaita 和字体；完整依赖见 [安装说明](docs/INSTALL.md)。
+
+Release 中的两份对应源码归档、依赖清单和验证文档供审计与重建使用，正常安装不需要下载源码归档。
+
+## 通过源码构建并安装
+
+先按 [构建依赖](docs/INSTALL.md#源码构建依赖) 安装系统开发工具和库，再执行：
+
+```bash
+git clone --branch v0.1.0 https://github.com/zcmmy/gnome-wallpaper.git
 cd gnome-wallpaper
-make help
+make package-backend
+make check
+make install
 ```
 
-源码已包含修改后的两层实现和上游自带的 External 源码，无需递归初始化 submodule。
-构建依赖、资源准备和首次安装步骤：[docs/INSTALL.md](docs/INSTALL.md)。
+`make package-backend` 从源码编译后端，首次构建需要联网下载固定版本的 CEF 构建依赖；发行程序不携带完整 CEF Web 后端。
+`make install` 使用已有构建临时组装完整包，再调用同一个原子安装器；不把源码软链接到安装目录。
+默认并行数为 4，可用 `BUILD_JOBS=2 make package-backend` 调整。
 
-```text
-make renderer               编译 C++，可能下载固定版本的 CEF 构建依赖
-make extension              仅生成插件 ZIP，不安装、不启用
-make check                  本地回归；C++ 视频测试需要已构建的渲染库
-make package DEST=/新目录   打包独立运行目录，目标必须不存在
+只生成可分发安装包、不安装时执行：
+
+```bash
+make extension DEST="$PWD/dist/local-package"
 ```
 
-仓库不包含 Wallpaper Engine assets、Workshop 壁纸、个人静态截图或预编译库。
-项目文档仅描述渲染技术与兼容行为，不提供具体壁纸名称、Workshop ID 或下载信息。
-这些资源必须由用户自行准备；缺少资源不影响阅读源码、打包插件和运行无素材的单元测试。
-独立运行目录可移走源码后继续使用，但仍依赖操作系统的 GNOME、图形驱动及系统库。
+目标目录必须不存在。自定义构建目录通过 `WALLPAPER_BUILD_DIR` 设置，构建和打包时使用同一值。
+修改过程序后需先提交相关文件，再组包；打包器校验 Git 源码快照、构建记录和二进制哈希。
+向他人发布二进制时，还需提供对应源码和依赖许可材料，见 [开发说明](docs/DEVELOPMENT.md)。
 
-## 目录
+## 首次启用和资源导入
 
-```text
-renderer/source/         修改后的 portghost 渲染源码（完整纳入顶层 Git）
-renderer/scripts/       渲染层构建、运行入口；renderer/tests/ 为独立测试
-gnome/extension/         修改后的 GNOME 扩展、管理 UI 与一次性任务
-gnome/scripts/          插件打包、原子安装及会话工具；gnome/tests/ 为独立测试
-integration/            两层协议、打包、维护、图形集成测试
-third_party/            固定上游来源、基线改动索引和许可证引用
-docs/                   安装、架构、开发、运行、验证、版本管理文档
-sources/、tools/         旧命令及 CMake 缓存的兼容入口
-assets/、wallpapers/、wallpaper/、deps/、build/  本地资源与生成物，Git 忽略
-runtime/、reports/、backups/、logs/           本地状态/报告/备份，仅说明文件入库
+安装不会自动启用扩展、添加启动项或重启桌面。GNOME 尚未发现新扩展，或当前会话缓存了旧代码时，请在方便时重新登录，然后执行：
+
+```bash
+gnome-extensions enable wallpaperengine@waylandwe
+gnome-extensions prefs wallpaperengine@waylandwe
 ```
 
-## 文档
+1. 在首页“首次使用”中选择自己的公共 assets 目录和壁纸文件夹，确认后复制导入；来源文件保持不变。
+2. 选择一张壁纸并点击“应用”。已有 `static-background.png` 时直接使用静态模式。
+3. 需要动画时明确打开动态开关。默认上限 15 FPS，后续切换沿用动态意图，直到关闭；新登录保持静态优先。
 
-- [安装与依赖](docs/INSTALL.md)
-- [架构与数据流](docs/ARCHITECTURE.md)
-- [开发和安全部署](docs/DEVELOPMENT.md)
-- [Git 版本管理](docs/VERSIONING.md)
-- [独立运行包](docs/RUNTIME.md)
-- [测试与验证](docs/VERIFICATION.md)
-- [目录维护与备份](docs/MAINTENANCE.md)
-- [上游项目与依赖](third_party/README.md)
-- [更新记录](CHANGELOG.md)
+没有静态图时，可提供自己的图片，或明确开启动态后生成一次 4K 渲染缩小至 1080p 的静态图。
+动态播放时也可手动触发独立高质量截图，不中断日常播放、不改变日常分辨率或 FPS。
+正式使用不需要 Looking Glass；开发会话更新入口仅用于测试。
 
-当前源码版本为 `v0.0.3`，版本说明见 [v0.0.3](docs/releases/v0.0.3.md)；GitHub Release 保持 v0.0.2。
-`main` 为稳定分支，`dev` 为开发分支；`v0` 标签保留首次发布的历史快照。
+## 功能与边界
 
-## 开源许可与来源
+- 静态缩略图和大图预览、导入、删除、切换，以及用户自定义静态图片。
+- 静态模式不运行渲染器、频谱采集或鼠标桥；动态通过 Wayland surface 合成。
+- 全局帧率上限、默认关闭的定时轮换、顺序或伪随机序列。
+- 兼容普通桌面、概览、应用列表和工作区切换，保留 Forge、焦点及空工作区合成修复。
+- 使用 Fontconfig 为缺失字形回退；中文、日文和韩文需系统中安装覆盖这些语言的字体。
+- 目标为 scene/video；不包含完整 Web/CEF 壁纸运行依赖，也不承诺所有特效或视频编解码组合。
 
-本项目原创代码和修改采用 **GPL-3.0-only**，继承 portghost 的 GPLv3 开源方式。
-完整条款见 [LICENSE](LICENSE)，第三方归属与许可例外见 [NOTICE.md](NOTICE.md)。
+## 安装位置与更新
 
-核心渲染器基于 [portghost-dev/linux-wallpaperengine](https://github.com/portghost-dev/linux-wallpaperengine)，
-固定基线为 [`50530e5167c0822e63f052f50ef8d8613663915a`](https://github.com/portghost-dev/linux-wallpaperengine/tree/50530e5167c0822e63f052f50ef8d8613663915a)。
-感谢 portghost、[Almamu](https://github.com/Almamu/linux-wallpaperengine) 及其贡献者提供的引擎基础。
-上游能力、本项目改动、GNOME 扩展来源及传递依赖详见 [第三方引用](third_party/README.md)。
+| 内容 | 默认位置 |
+| --- | --- |
+| 插件、后端和私有库 | `~/.local/share/gnome-shell/extensions/wallpaperengine@waylandwe/` |
+| assets、壁纸、静态图和图库索引 | `~/.local/share/gnome-wallpaper/` |
+| 可重建缓存 | `~/.cache/gnome-wallpaper/` |
+| 日志、恢复和迁移状态 | `~/.local/state/gnome-wallpaper/` |
 
+遵循 XDG 路径配置；源码、build、发行包、已安装程序和用户资源相互分离。
+程序更新或卸载不删除用户资源。旧 runtime 用户可在设置中使用“迁移旧版资源”；先保留旧目录，迁移不自动播放。
+升级、回滚说明见 [完整包管理](docs/FULL-PACKAGE.md)。
+
+## 源码与文档
+
+`renderer/` 为 C++ 渲染层，`gnome/` 为 Shell/管理界面，`integration/` 为协议和集成测试，
+`packaging/` 为构建、依赖审计、安装和发布工具。`build/`、`dist/`、用户资源及个人报告不进入 Git。
+
+- [开发与构建](docs/DEVELOPMENT.md)
+- [v0.1.0 项目重构](docs/REFACTORING-v0.1.0.md)
+- [运行架构](docs/ARCHITECTURE.md)
+- [验证入口](docs/VERIFICATION.md)与[两轮全新安装验收](docs/FRESH-INSTALL-VALIDATION.md)
+- [v0.1.0 版本说明](docs/releases/v0.1.0.md)与[更新记录](CHANGELOG.md)
+- [版本管理](docs/VERSIONING.md)与[上游来源](third_party/README.md)
+
+## 开源许可
+
+本项目原创代码和修改采用 **GPL-3.0-only**，继承 portghost 的开源许可；见 [LICENSE](LICENSE) 和 [NOTICE.md](NOTICE.md)。
+渲染器基于 [portghost-dev/linux-wallpaperengine](https://github.com/portghost-dev/linux-wallpaperengine)，固定基线为
+[`50530e5167c0822e63f052f50ef8d8613663915a`](https://github.com/portghost-dev/linux-wallpaperengine/tree/50530e5167c0822e63f052f50ef8d8613663915a)，保留 Almamu 等上游归属。
 GNOME 层基于 [diaslucass/wallpaperEngineWayland](https://github.com/diaslucass/wallpaperEngineWayland)。
-机器可读的固定来源见 [sources.lock.json](third_party/sources.lock.json)。
-当前集成以本仓库顶层文档为准，保留的上游 README/docs 用于描述原始项目。
+第三方例外、版本与依赖对应源码说明见 [第三方引用](third_party/README.md)。项目许可证不授予任何用户素材的权利。

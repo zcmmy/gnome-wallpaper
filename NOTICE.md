@@ -39,9 +39,11 @@ code's GPL-2.0-or-later grant.
 
 ## Separately licensed and user-provided content
 
-The upstream `renderer/source/lwe-ui/` control panel is MIT-licensed according to
-its `pyproject.toml`. External components retain their respective license files
-and notices; see the source repository's `third_party/licenses.json` index.
+The unused upstream `lwe-ui` control panel, its tests, the mixed installer and
+demonstration images have been removed from this source distribution. The C++
+renderer and its upstream attribution remain. External components retain their
+respective license files and notices; see `third_party/licenses.json` and
+`third_party/COMPONENT-NOTICES.md` in the source repository.
 Text fallback uses the system Fontconfig library (MIT-style license); it is not
 vendored here. Fontconfig source and license: https://gitlab.freedesktop.org/fontconfig/fontconfig .
 FreeType and installed font files retain their own licensing; system font discovery

@@ -1,47 +1,23 @@
 #!/usr/bin/env python3
-"""Build the public plugin release; never include local runtime or user resources."""
-import hashlib
-import json
-from pathlib import Path
-import re
-import shutil
-import subprocess
-import sys
-import zipfile
-
-root = Path(__file__).resolve().parents[2]
-version = (root / 'VERSION').read_text().strip()
-if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+', version):
-    raise SystemExit('Expected semantic project VERSION')
-if len(sys.argv) > 2:
-    raise SystemExit('Usage: package-release.py [NEW_OUTPUT_DIRECTORY]')
-out = Path(sys.argv[1]).absolute() if len(sys.argv) == 2 else root / 'build/releases' / version
-out.mkdir(parents=True, exist_ok=False)
-archive = out / f'gnome-wallpaper-{version}.shell-extension.zip'
-subprocess.run(['bash', str(root / 'gnome/scripts/build.sh'), str(archive)], check=True)
-with zipfile.ZipFile(archive) as z:
-    if z.testzip() is not None:
-        raise SystemExit('Invalid ZIP')
-    names = set(z.namelist())
-    required = {'LICENSE', 'NOTICE.md', 'VERSION', 'metadata.json', 'extension.js', 'prefs.js',
-                'compositingGuard.js', 'captureWorker.py', 'libraryWorker.py', 'schemas/gschemas.compiled'}
-    assert required <= names, required - names
-    assert z.read('VERSION').decode().strip() == version
-    metadata = json.loads(z.read('metadata.json'))
-    assert metadata['uuid'] == 'wallpaperengine@waylandwe'
-    assert metadata['url'] == 'https://github.com/zcmmy/gnome-wallpaper'
-    for name in names:
-        # Explicit extension-only allowlist; no hidden local state or media assets.
-        assert (name in {'LICENSE', 'NOTICE.md', 'VERSION', 'metadata.json', 'schemas/gschemas.compiled'}
-                or ('/' not in name and name.endswith(('.js', '.py')))
-                or (name.startswith('schemas/') and name.endswith('.gschema.xml'))), name
-    for name in names:
-        if name.endswith('.js'):
-            for ref in re.findall(r"from ['\"]\./([^'\"]+)['\"]", z.read(name).decode()):
-                assert ref in names, (name, ref)
-shutil.copyfile(root / 'gnome/scripts/install-extension.py', out / 'install-extension.py')
-shutil.copyfile(root / 'docs/PLUGIN-INSTALL.md', out / f'INSTALL-{version}.md')
-files = sorted(out.iterdir())
-(out / 'SHA256SUMS').write_text(''.join(
-    f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in files))
+"""Release assembly requires the full program package and corresponding dependency sources."""
+import json,os,pathlib,subprocess,sys,hashlib,tarfile
+root=pathlib.Path(__file__).resolve().parents[2]
+source_dir=pathlib.Path(os.environ.get('WALLPAPER_DEPENDENCY_SOURCES','/nonexistent'))
+source_index=source_dir/'sources.json'
+if not source_index.is_file():raise SystemExit('Collect exact dependency sources with packaging/fetch-sources.py first; set WALLPAPER_DEPENDENCY_SOURCES. No incomplete Release will be built.')
+version=(root/'VERSION').read_text().strip();out=pathlib.Path(sys.argv[1]).absolute() if len(sys.argv)>1 else root/'dist'/version
+build=pathlib.Path(os.environ.get('WALLPAPER_BUILD_DIR',root/'build/package-renderer'))
+subprocess.run([sys.executable,str(root/'packaging/build-package.py'),'--build-dir',str(build),'--output',str(out)],check=True)
+manifest=json.loads((out/'backend-manifest.json').read_text());index=json.loads(source_index.read_text())
+sys.path.insert(0,str(root/'packaging'))
+from verify_sources import verify
+print('Verified corresponding sources:',verify(manifest,source_dir))
+required={(r['source_package'],r['source_version']) for r in manifest['libraries']+manifest.get('source_inputs',[]) if 'source_package' in r}
+if not required<={tuple(p) for p in index['packages']}:raise SystemExit('Dependency sources do not match the binary manifest')
+for name,digest in index['files'].items():
+ if pathlib.Path(name).name!=name or hashlib.sha256((source_dir/name).read_bytes()).hexdigest()!=digest:raise SystemExit('Dependency source hash mismatch')
+with tarfile.open(out/'dependency-corresponding-sources.tar.gz','w:gz') as tar:
+ for name in sorted(index['files']):tar.add(source_dir/name,arcname=name)
+ tar.add(source_index,arcname='sources.json')
+(out/'SHA256SUMS').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in sorted(out.iterdir()) if p.is_file() and p.name!='SHA256SUMS'))
 print(out)

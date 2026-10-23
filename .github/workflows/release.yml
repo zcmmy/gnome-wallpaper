@@ -1,8 +1,13 @@
 name: Publish plugin release
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing reviewed version tag (full package release)'
+        required: true
+      artifact_run:
+        description: 'Verified Debian 13 full-package build run containing sources and checksums'
+        required: true
 permissions:
   contents: read
 concurrency:
@@ -13,28 +18,35 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     env:
-      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_TAG: ${{ inputs.tag }}
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
+      ARTIFACT_RUN: ${{ inputs.artifact_run }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.tag }}
           persist-credentials: false
-      - name: Verify version and tools
+      - uses: actions/download-artifact@v4
+        with:
+          name: full-extension-release
+          run-id: ${{ inputs.artifact_run }}
+          github-token: ${{ github.token }}
+          path: dist/release
+      - name: Verify complete release inputs
         run: |
           test "$(cat VERSION)" = "$RELEASE_TAG"
           test -f "docs/releases/$RELEASE_TAG.md"
-          command -v gh
-          if ! command -v glib-compile-schemas; then
-            sudo apt-get update
-            sudo apt-get install -y libglib2.0-bin
-          fi
-      - name: Build and verify plugin assets
-        run: |
-          python3 integration/scripts/package-release.py
-          cd "build/releases/$RELEASE_TAG"
+          test -f dist/release/dependency-corresponding-sources.tar.gz
+          test -f dist/release/renderer-corresponding-source.tar.gz
+          gh api "repos/$GH_REPO/actions/runs/$ARTIFACT_RUN" > /tmp/build-run.json
+          SOURCE_COMMIT=$(git rev-parse HEAD) python3 -c 'import json,os; r=json.load(open("/tmp/build-run.json")); assert r["conclusion"]=="success" and r["head_sha"]==os.environ["SOURCE_COMMIT"] and r["path"]==".github/workflows/build-full-package.yml"'
+          export SOURCE_COMMIT=$(git rev-parse HEAD)
+          cd dist/release
           sha256sum --check SHA256SUMS
+          python3 -c 'import json,os; m=json.load(open("backend-manifest.json")); assert m["version"]==os.environ["RELEASE_TAG"] and m["renderer_build"]["commit"]==os.environ["SOURCE_COMMIT"]'
       - name: Create draft, upload assets, then publish
         run: |
           # A failed upload leaves a draft. Re-running resumes only that draft.
@@ -44,5 +56,5 @@ jobs:
             gh release create "$RELEASE_TAG" --verify-tag --draft \
               --title "GNOME Wallpaper $RELEASE_TAG" --notes-file "docs/releases/$RELEASE_TAG.md"
           fi
-          gh release upload "$RELEASE_TAG" "build/releases/$RELEASE_TAG/"* --clobber
+          gh release upload "$RELEASE_TAG" "dist/release/"* --clobber
           gh release edit "$RELEASE_TAG" --draft=false --latest

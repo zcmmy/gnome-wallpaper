@@ -14,7 +14,7 @@ export async function startTest(ext) {
   assert(!ext._proc&&!ext._staticOverview.group,'idle allocated resources');
   Main.overview.showApps();await delay(1800);
   let state=check('static-apps');assert(!ext._proc&&state.active&&state.mapped&&state.backgrounds.every(b=>b.loaded&&b.width>=1200&&b.height>=700),'static background absent');await capture('static-apps');
-  ext._settings.set_string('selected-id','3582858114');await delay(1700);
+  ext._settings.set_string('selected-id',GLib.getenv('WALLPAPER_TEST_SCENE_B'));await delay(1700);
   state=check('static-switch');assert(!ext._proc&&state.active,'static selection lost app background');await capture('static-switch');
   Main.overview.hide();await delay(900);state=check('hidden');assert(!state.active&&!ext._proc,'hidden overview retained resources');
   ext._settings.set_boolean('enabled',true);await wait(()=>ext._rendererReady);

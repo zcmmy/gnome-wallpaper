@@ -13,8 +13,8 @@ app.connect('activate',()=>{
   try{
    tick++;
    if(tick===3){assert(ui.model.items.length===7,'library count');assert(ui.importButton.label==='导入壁纸…'&&ui.removeButton.label==='删除壁纸…','file controls missing');assert(ui.model.connected,'controller not connected');ui.search.text='拉特兰';ui.flow.invalidate_filter();console.log('UI-TEST library connected');}
-   if(tick===4){ui.search.text='';let row=ui.flow.get_first_child();while(row&&row._item.id!=='3582858114')row=row.get_next_sibling();ui.flow.select_child(row);ui.apply.emit('clicked');}
-   if(tick===5){assert(settings.get_string('selected-id')==='3582858114','apply action');assert(!settings.get_boolean('enabled'),'preview enabled renderer');assert(!ui.runtimeCapture.sensitive,'static mode allows runtime capture');capture('ui-library');}
+   if(tick===4){ui.search.text='';let row=ui.flow.get_first_child();while(row&&row._item.id!==GLib.getenv('WALLPAPER_TEST_SCENE_B'))row=row.get_next_sibling();ui.flow.select_child(row);ui.apply.emit('clicked');}
+   if(tick===5){assert(settings.get_string('selected-id')===GLib.getenv('WALLPAPER_TEST_SCENE_B'),'apply action');assert(!settings.get_boolean('enabled'),'preview enabled renderer');assert(!ui.runtimeCapture.sensitive,'static mode allows runtime capture');capture('ui-library');}
    if(tick===7){window.set_visible_page(ui.pages[2]);ui.fps.set_value(15);capture('ui-settings');}
    if(tick===10){window.set_visible_page(ui.pages[1]);ui.sequence.selected=1;ui.interval.set_value(30);ui.rotate.active=true;capture('ui-rotation');ui.all.active=false;}
    if(tick===11){const findCheck=w=>{if(w instanceof Gtk.CheckButton)return w;for(let c=w.get_first_child();c;c=c.get_next_sibling()){const found=findCheck(c);if(found)return found;}return null;};let row=ui.rotationList.get_first_child();findCheck(row).active=true;findCheck(row.get_next_sibling()).active=true;}

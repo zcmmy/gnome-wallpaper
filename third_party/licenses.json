@@ -26,15 +26,24 @@
     "renderer/source/src/External/kissfft/LICENSES/Unlicense",
     "renderer/source/src/External/quickjs/LICENSE",
     "renderer/source/src/External/stb/LICENSE",
-    "renderer/source/src/External/stb/data/herringbone/license.txt"
+    "renderer/source/src/External/stb/data/herringbone/license.txt",
+    "renderer/source/src/External/stb/tests/pngsuite/PngSuite.LICENSE"
   ],
   "project": {
     "spdx": "GPL-3.0-only",
     "file": "LICENSE",
     "notice": "NOTICE.md"
   },
-  "upstream_lwe_ui": {
-    "spdx": "MIT",
-    "declaration": "renderer/source/lwe-ui/pyproject.toml"
-  }
+  "additional_license_files": [
+    "renderer/source/CMakeModules/COPYING-CMAKE-SCRIPTS",
+    "renderer/source/CMakeModules/LICENSE-CEF",
+    "renderer/source/CMakeModules/FindDBus.cmake",
+    "third_party/licenses/CallStack-BSD-3-Clause",
+    "third_party/licenses/libglm-dev-copyright",
+    "third_party/licenses/wayland-protocols-copyright",
+    "renderer/source/protocols/wlr-foreign-toplevel-management-unstable-v1.xml",
+    "renderer/source/protocols/wlr-layer-shell-unstable-v1.xml"
+  ],
+  "scope_note": "Source notice index, including build/test-only components; not a binary dependency manifest or corresponding-source offer.",
+  "component_notices": "third_party/COMPONENT-NOTICES.md"
 }

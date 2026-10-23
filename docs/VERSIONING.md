@@ -1,11 +1,11 @@
 # Git 与版本发布
 
 统一仓库：git@github.com:zcmmy/gnome-wallpaper.git
-稳定分支：main；日常开发分支：dev。当前源码版本：VERSION 中的 v0.0.3；GitHub Release 保持 v0.0.2。
-本次仅推送 dev/main，v0.0.3 附注标签保留在本地；推送 v* 标签会触发 Release 工作流，因此未经发布授权不要推送该标签。
+稳定分支：main；日常开发分支：dev。当前版本：VERSION 中的 v0.1.0，提供完整预编译 Release。
+历史标签保留，工作流手动触发；标签与公开发布必须由用户明确授权。
 未发布功能先进入 dev，达到发布条件并完成审查后再合并到 main；普通功能提交不代表新版本发布。
 renderer/source、gnome/extension 均是顶层仓库中的普通源码目录，不是 gitlink/submodule。
-选择完整源码快照是为了让本地补丁可随一次 clone 获得，避免引用只有开发机才有的提交。
+采用纳入顶层 Git 的源码快照，让本地补丁可随一次 clone 获得；已裁剪未使用的上游 UI 和演示资源，范围见 third_party/sources.lock.json。
 不自动推送回上游项目，不依赖原始嵌套 .git。
 
 ## 常规开发
@@ -56,12 +56,20 @@ reports/backups/runtime 各保留一份目录说明。私有资源测试需用�
 ## 插件 Release 发布
 
 更新 VERSION、CHANGELOG、README、版本说明、PLUGIN-INSTALL 和 metadata 整数版本后运行 `make check`。
-`make release-package` 生成 `build/releases/<版本>/`，该目录须尚不存在，避免混入旧产物。
-附件为插件 ZIP、原子安装器、Markdown 安装说明和 SHA256SUMS，不包含用户资源或 C++ 后端。
-ZIP 条目固定时间与权限，同一 GLib/Python 工具链下可重复构建；不同版本 schema 编译工具可能产生不同结果。
+先通过 `packaging/fetch-sources.py` 收集精确依赖源码，并设置 `WALLPAPER_DEPENDENCY_SOURCES`。
+`make release-package` 生成 `dist/<版本>/`，目录须尚不存在，避免混入旧产物。
+附件为包含后端与私有库的完整插件 ZIP、原子安装器、Markdown 安装说明、构建清单、对应源码和 SHA256SUMS；不包含用户资源。
+ZIP 条目固定时间与权限，同一 GLib/Python 工具链下可重复组装；整个二进制构建尚不保证字节级可复现。
 
-完成 dev → main 合并并创建附注标签后，推送 main、dev 和新标签。
-`.github/workflows/release.yml` 在版本标签上校验 VERSION、构建插件、验证校验和，先建立草稿并上传完整附件，再公开 Release。
+完成 dev → main 合并并创建附注标签后，按授权推送分支与标签。
+先手动运行 `build-full-package.yml`，验证产物和干净环境验收结果；然后手动执行 `release.yml`，指定版本标签及同一提交的成功构建 run ID。
+发布工作流校验来源、版本、对应源码和校验和，先建立草稿并上传完整附件，再公开 Release。
 工作流只为发布任务授予仓库 contents:write 权限，使用 GitHub 自动生成的短期 token。
 失败重试只允许更新同名草稿，不覆盖已公开 Release；历史标签不移动。
 发布后核对远端分支、标签、Release 附件，并下载验证 SHA-256。
+
+## 完整包功能分支
+
+完整包的构建与发布工作流均为手动触发，推送分支或标签不再自动发布。
+构建清单锁定 Debian 13 输入版本；公开发布必须有精确依赖源包、对应后端源码及校验和。
+v0.1.0 按用户授权将 `feature/extension-package` 合并至 dev，再合并至 main，保留功能分支；历史 Release 不覆盖。

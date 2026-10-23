@@ -5,6 +5,8 @@ import GLib from 'gi://GLib';
 import GdkPixbuf from 'gi://GdkPixbuf';
 import {readLibrary, replaceStaticImage, imageInfo} from './library.js';
 import {fileOperation, deleteWallpaper, refreshFiles} from './libraryOps.js';
+import {addResourceSetup} from './resourceSetup.js';
+import {assetsReady} from './common/paths.js';
 import {restoreStaticWallpaper} from './staticWallpaper.js';
 
 function button(label, callback, style = null) {
@@ -68,6 +70,11 @@ export function fillManagerWindow(window, settings) {
     };
     widen(page);
 
+    const setupGroup = new Adw.PreferencesGroup({title:'首次使用',description:'先导入自备的 assets 和壁纸文件夹，再选择壁纸并点击应用。导入不会开启动态播放。'});
+    const setupActions = new Gtk.Box({spacing:8});
+    setupActions.append(button('导入 assets…',()=>resourceSetup.choose('assets')));
+    setupActions.append(button('导入壁纸…',()=>resourceSetup.choose('import')));
+    setupGroup.add(setupActions); page.add(setupGroup);
     const stateGroup = new Adw.PreferencesGroup({title:'桌面壁纸'}); page.add(stateGroup);
     const stateRow = new Adw.ActionRow({title:'静态模式', subtitle:'选择壁纸后点击应用；浏览图片不会改变桌面。'});
     const mode = new Gtk.Switch({valign:Gtk.Align.CENTER, tooltip_text:'开启动态后，后续切换和轮换继续使用动态模式'});
@@ -92,15 +99,7 @@ export function fillManagerWindow(window, settings) {
     const filter = new Gtk.DropDown({model:Gtk.StringList.new(['全部','场景','视频','缺少静态图'])});
     const searchRow = new Gtk.Box({spacing:8}); searchRow.append(search); searchRow.append(filter); gallery.add(searchRow);
     const importRow=new Gtk.Box({spacing:8,margin_top:8});
-    const importButton=button('导入壁纸…',()=>new Gtk.FileDialog({title:'选择单张壁纸目录，或包含多张壁纸的目录'}).select_folder(window,null,(dialog,result)=>{
-        let path;try{path=dialog.select_folder_finish(result)?.get_path();}catch(_){return;}if(!path)return;
-        mutate(async()=>{
-            const result=await fileOperation('import',settings.get_string('library-root'),path);
-            refreshFiles(settings);
-            toast(`导入 ${result.imported.length} 张，跳过已有 ${result.skipped.length} 张，失败 ${result.errors.length} 张`);
-            if(result.errors.length){const info=new Adw.AlertDialog({heading:'部分壁纸未能导入',body:result.errors.map(e=>e.id+'：'+e.message).join('\n')});info.add_response('ok','知道了');info.present(window);}
-        });
-    }));importRow.append(importButton);importRow.append(label('复制到壁纸库，保留原文件；已有同名目录会跳过。','dim-label'));gallery.add(importRow);
+    const importButton=button('导入壁纸…',()=>resourceSetup.choose('import'));importRow.append(importButton);importRow.append(label('复制到管理图库，保留原文件。','dim-label'));gallery.add(importRow);
     const body = new Gtk.Box({spacing:20, homogeneous:true, margin_top:12, valign:Gtk.Align.START}); gallery.add(body);
     const flow = new Gtk.FlowBox({selection_mode:Gtk.SelectionMode.SINGLE, max_children_per_line:2, min_children_per_line:2, homogeneous:true, row_spacing:8, column_spacing:8, valign:Gtk.Align.START, activate_on_single_click:true});
     const scroller = new Gtk.ScrolledWindow({child:flow, hscrollbar_policy:Gtk.PolicyType.NEVER, min_content_height:470, max_content_height:620, vexpand:true, hexpand:true});
@@ -174,7 +173,7 @@ export function fillManagerWindow(window, settings) {
     function show(item) {
         model.selected=item;
         title.set_label(item?.title ?? '壁纸库为空');
-        description.set_label(item ? `${item.type === 'video' ? '视频' : '场景'} · ${item.id}` : '在设置中选择包含 project.json 子目录的壁纸库。');
+        description.set_label(item ? `${item.type === 'video' ? '视频' : '场景'} · ${item.id}` : '点击“导入壁纸”开始；已有静态图可直接使用。');
         preview.set_paintable(null);
         if (item) {try {preview.set_pixbuf(GdkPixbuf.Pixbuf.new_from_file_at_scale(infoPath(item),760,428,true));} catch (_) {}}
         missing.set_label(item ? (item.ready ? '静态图片已准备，可直接应用。' : '当前展示作者预览图。缺少完整静态图片，可自行指定，或开启动态后自动截图一次。') + (item.warning ? '\n'+item.warning : '') : '');
@@ -207,6 +206,7 @@ export function fillManagerWindow(window, settings) {
         }
         if (!flow.get_selected_children().length && flow.get_first_child())flow.select_child(flow.get_first_child());
         if(!model.items.length)show(null);
+        setupGroup.set_visible(!assetsReady() || !model.items.length);
         gallery.set_title(`本地壁纸 · ${model.items.length} 张`);
         rebuildRotation(); updateStatus();
     }
@@ -267,11 +267,7 @@ export function fillManagerWindow(window, settings) {
     const scaling=new Adw.ComboRow({title:'画面适配',model:Gtk.StringList.new(['填满屏幕（裁剪）','完整显示（留边）','拉伸'])});
     const scales=['fill','fit','stretch'];scaling.selected=Math.max(0,scales.indexOf(settings.get_string('scaling')));scaling.connect('notify::selected',()=>settings.set_string('scaling',scales[scaling.selected]));playback.add(scaling);
     const paths=new Adw.PreferencesGroup({title:'资源与恢复'});options.add(paths);
-    const library=new Adw.ActionRow({title:'壁纸库目录',subtitle:settings.get_string('library-root')});
-    library.add_suffix(button('选择…',()=>new Gtk.FileDialog({title:'选择壁纸库根目录'}).select_folder(window,null,(dialog,result)=>{try{const file=dialog.select_folder_finish(result);if(file?.get_path())settings.set_string('library-root',file.get_path());}catch(_){}})));paths.add(library);
-    for(const [key,text] of [['wallpaperengine-path','Portghost 可执行程序'],['assets-path','Wallpaper Engine 公共资源']]){
-        const row=new Adw.EntryRow({title:text,show_apply_button:true});row.text=settings.get_string(key);row.connect('apply',()=>settings.set_string(key,row.text.trim()));paths.add(row);
-    }
+    const resourceSetup=addResourceSetup(window,options,settings);
     const restore=new Adw.ActionRow({title:'恢复最初的 GNOME 壁纸',subtitle:'会关闭动态播放与轮换，保留壁纸库和自定义静态图片。'});
     restore.add_suffix(button('恢复',()=>{
         const dialog=new Adw.AlertDialog({heading:'恢复原来的壁纸？',body:'动态播放与定时轮换将关闭。壁纸库中的图片不会删除。'});
@@ -279,19 +275,19 @@ export function fillManagerWindow(window, settings) {
         dialog.choose(window,null,(dlg,res)=>{if(dlg.choose_finish(res)!=='restore')return;try{settings.set_boolean('rotation-enabled',false);settings.set_boolean('enabled',false);if(!restoreStaticWallpaper())throw new Error('未找到备份');toast('已恢复原来的壁纸。');}catch(e){toast(e.message);}});
     }));paths.add(restore);
 
-    for(const key of ['library-root','library-revision','static-revision'])watch(key,()=>{library.set_subtitle(settings.get_string('library-root'));reload();});
-    for(const key of ['runtime-status','enabled','selected-id','fps'])watch(key,()=>{if(key==='runtime-status'){try{model.connected=JSON.parse(settings.get_string(key)).active===true;}catch(_){}}updateStatus();});
+    for(const key of ['library-root','library-revision','static-revision'])watch(key,()=>{resourceSetup.refresh();reload();});
+    for(const key of ['runtime-status','enabled','selected-id','fps'])watch(key,()=>{if(key==='runtime-status'){try{{const state=JSON.parse(settings.get_string(key));model.connected=state.active===true&&state.packageProtocol===1;}}catch(_){}}updateStatus();});
     for(const key of ['rotation-all','rotation-ids'])watch(key,scheduleRotationRebuild);
     for(const key of ['rotation-next-at','rotation-enabled'])watch(key,updateDeadline);
     watch('rotation-mode',()=>{sequence.selected=settings.get_string('rotation-mode')==='shuffle'?1:0;});
     const cancel=new Gio.Cancellable();
     Gio.DBus.session.call('org.gnome.Shell','/org/gnome/Shell/WallpaperManager','org.wallpaper.Manager','Snapshot',null,new GLib.VariantType('(s)'),Gio.DBusCallFlags.NONE,2000,cancel,(bus,result)=>{
         if(model.closed)return;
-        try{const [json]=bus.call_finish(result).deep_unpack();model.connected=JSON.parse(json).active===true;}catch(_){model.connected=false;}
+        try{const [json]=bus.call_finish(result).deep_unpack();{const state=JSON.parse(json);model.connected=state.active===true&&state.packageProtocol===1;}}catch(_){model.connected=false;}
         updateStatus();
     });
     window.connect('close-request',()=>{if(busy){toast('正在处理壁纸文件，请稍候');return true;}model.closed=true;if(rotationRebuild)GLib.source_remove(rotationRebuild);rotationRebuild=0;cancel.cancel();for(const id of signals)settings.disconnect(id);signals.length=0;return false;});
     reload();
     // Exposed to the isolated UI driver; no automatic actions or timers.
-    return {model,flow,search,filter,apply,mode,importButton,removeButton,capture,runtimeCapture,fps,rotate,interval,sequence,all,rotationList:list,reload,show,pages:[page,rotationPage,options]};
+    return {resourceSetup,setupGroup,model,flow,search,filter,apply,mode,importButton,removeButton,capture,runtimeCapture,fps,rotate,interval,sequence,all,rotationList:list,reload,show,pages:[page,rotationPage,options]};
 }

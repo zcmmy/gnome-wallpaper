@@ -57,7 +57,7 @@ WALLPAPER_TEST_RUNTIME 指定运行目录，WALLPAPER_TEST_ID 可选择用户自
 在 Looking Glass 中显式执行：
 
 ```javascript
-(await import('file:///home/clx/workspace/wallpaper_adapter/gnome/scripts/apply-compositing-fix.js')).apply()
+(await import('file://<项目目录>/gnome/scripts/apply-compositing-fix.js')).apply()
 ```
 
 该入口只加载不含 GObject 注册的保护模块，并包装窗口创建/清理方法；可以保护当前正在播放的窗口，

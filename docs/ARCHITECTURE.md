@@ -1,4 +1,4 @@
-# v0 架构
+# v0.1.0 架构
 
 GNOME 层：extension.js -> wallpaperExtension.js + manager.js。
 GTK4/libadwaita 的 managerUi.js 通过 GSettings 控制模式、选择、FPS 和轮换。
@@ -30,5 +30,6 @@ pointerBridge.js 把桌面鼠标坐标送入本地 IPC；rendererClient.js 更�
 
 renderer/source 是渲染层源码；gnome/extension 是 Shell/GTK/任务适配层。
 [integration/contracts/renderer-control-v1.md](../integration/contracts/renderer-control-v1.md) 定义 CLI、指针/FPS IPC 与截图接口。
-运行包复制程序、私有库、用户资源和插件；不通过软链接依赖开发目录。
+完整插件包包含程序与私有库；用户资源通过界面复制到独立 XDG 数据目录，不进入程序包。两者均不依赖开发目录软链接。
+路径、安装事务与发行分层详见 [重构说明](REFACTORING-v0.1.0.md)。
 布局、主题和 Dock/顶栏配置不由本项目管理；测试会在私有会话复制相关扩展配置作兼容验证。

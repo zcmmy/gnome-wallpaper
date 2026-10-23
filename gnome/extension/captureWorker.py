@@ -28,7 +28,11 @@ def capture(args):
     output.parent.mkdir(parents=True,exist_ok=True)
     diagnostic=pathlib.Path(args.diagnostics).absolute() if args.diagnostics else None
     if diagnostic:diagnostic.mkdir(parents=True,exist_ok=True)
-    lockdir=pathlib.Path(os.environ.get('XDG_RUNTIME_DIR','/tmp'))
+    data=pathlib.Path(os.environ.get('XDG_DATA_HOME',str(pathlib.Path.home()/'.local/share')))/'gnome-wallpaper'
+    data.mkdir(parents=True,exist_ok=True,mode=0o700)
+    resource_lock=(data/'.write.lock').open('a')
+    fcntl.flock(resource_lock,fcntl.LOCK_SH)
+    lockdir=data
     # Serialize capture jobs, including quick wallpaper switches.
     with (lockdir/('wallpaper-hq-'+str(os.getuid())+'.lock')).open('a') as lock:
         deadline=time.monotonic()+65

@@ -31,7 +31,7 @@ function releaseRenderer(settings,oldPid) {
 }
 async function retainStill(item) {
     if(!imageInfo(item.still))return;
-    const path=GLib.build_filenamev([GLib.get_user_state_dir(),'wallpaper-adapter','retained-background']);
+    const path=GLib.build_filenamev([GLib.get_user_state_dir(),'gnome-wallpaper','retained-background']);
     GLib.mkdir_with_parents(path,0o700);
     await new Promise((resolve,reject)=>Gio.File.new_for_path(item.still).copy_async(Gio.File.new_for_path(path+'/static-background.png'),Gio.FileCopyFlags.OVERWRITE,GLib.PRIORITY_DEFAULT,null,null,(file,result)=>{try{file.copy_finish(result);resolve();}catch(e){reject(e);}}));
     applyStaticWallpaper(path);

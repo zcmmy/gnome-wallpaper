@@ -8,6 +8,8 @@ cp "$root/gnome/extension/schemas/"*.gschema.xml "$stage/schemas/"
 glib-compile-schemas --strict "$stage/schemas"
 export GSETTINGS_SCHEMA_DIR="$stage/schemas"
 export GIO_USE_VFS=local
+export XDG_CACHE_HOME="$stage/cache" XDG_DATA_HOME="$stage/data" XDG_RUNTIME_DIR="$stage/run"
+mkdir -m 700 -p "$XDG_RUNTIME_DIR"
 python3 - "$stage/scene/static-background.png" <<'FIXTURE'
 import struct, sys, zlib
 from pathlib import Path
@@ -17,6 +19,7 @@ png = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 2, 2, 8, 2, 
 png += chunk(b'IDAT', zlib.compress((b'\x00' + b'\x22\x44\x66' * 2) * 2)) + chunk(b'IEND', b'')
 Path(sys.argv[1]).write_bytes(png)
 FIXTURE
+XDG_STATE_HOME="$stage/state-paths" GSETTINGS_BACKEND=memory gjs -m "$root/packaging/test-paths.js"
 XDG_STATE_HOME="$stage/state" GSETTINGS_BACKEND=memory gjs -m "$root/gnome/tests/check-static-wallpaper.js" "$stage/scene"
 GSETTINGS_SCHEMA_DIR="$stage/schemas" XDG_STATE_HOME="$stage/state-manager" TEST_LIBRARY="$stage/library" GSETTINGS_BACKEND=memory dbus-run-session -- gjs -m "$root/gnome/tests/check-manager.js"
 XDG_STATE_HOME="$stage/state-runtime-capture" TEST_LIBRARY="$stage/runtime-capture" GSETTINGS_BACKEND=memory dbus-run-session -- gjs -m "$root/gnome/tests/check-runtime-capture.js"
@@ -35,7 +38,8 @@ with zipfile.ZipFile(sys.argv[1]) as z:
  for n in names:
   if n.endswith('.js'):
    for ref in re.findall(r"from ['\"]\./([^'\"]+)['\"]",z.read(n).decode()):
-    assert ref in names,(n,ref)
+    import posixpath
+    assert posixpath.normpath(posixpath.join(posixpath.dirname(n),ref)) in names,(n,ref)
 print('PASS: extension archive includes local modules/schema and excludes the renderer')
 VERIFY
 

@@ -2,7 +2,7 @@
 /assets/
 /wallpapers/
 /wallpaper/
-/deps/
+/deps
 /build/
 /runtime/*
 !/runtime/README.md
@@ -21,3 +21,8 @@ gschemas.compiled
 .idea/
 .vscode/
 .DS_Store
+
+# Local internal development documents; not distributed.
+/docs/internal/
+
+/dist/

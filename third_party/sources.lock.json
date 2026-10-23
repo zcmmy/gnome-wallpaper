@@ -9,12 +9,25 @@
       "repository": "https://github.com/portghost-dev/linux-wallpaperengine.git",
       "commit": "50530e5167c0822e63f052f50ef8d8613663915a",
       "upstream_tree": "c14e1038686401747ff45bfbb248c53659968565",
-      "integration": "vendored source snapshot with local modifications",
+      "integration": "trimmed vendored renderer source with local modifications",
       "license_file": "renderer/source/LICENSE",
       "license": "GPL-3.0-only",
       "license_evidence": [
         "renderer/source/README.md#license",
         "renderer/source/packaging/archlinux/PKGBUILD"
+      ],
+      "excluded_upstream_paths": [
+        "renderer/source/lwe-ui",
+        "renderer/source/docs/images",
+        "renderer/source/install.sh"
+      ],
+      "relocated_upstream_files": [
+        {
+          "from": "renderer/source/lwe-ui/tests/fixtures/help/engine-debug.txt",
+          "to": "renderer/source/src/WallpaperEngine/Testing/Fixtures/engine-debug.txt",
+          "sha256": "eacf642fc283ab5c64467b07bb1ffa3ed7028971b8f738f263ec2e1d8ae7c4b0",
+          "content_origin": "Exact helpText string in renderer Application/DebugSwitches.cpp"
+        }
       ]
     },
     {

@@ -56,13 +56,13 @@ try:
   time.sleep(.1)
  else:raise RuntimeError('Private compositor startup timed out')
  env.update(WAYLAND_DISPLAY='wallpaper-capture-test',DBUS_SESSION_BUS_ADDRESS=(profile/'bus-address').read_text())
- scenes=sorted(library.glob('*/project.json'),key=lambda p:(p.parent.name!='3721991999',p.parent.name))
+ scenes=sorted(library.glob('*/project.json'),key=lambda p:(p.parent.name!=os.environ.get('WALLPAPER_TEST_REFERENCE',''),p.parent.name))
  if os.environ.get("WALLPAPER_CAPTURE_IDS"):scenes=[p for p in scenes if p.parent.name in os.environ["WALLPAPER_CAPTURE_IDS"].split(",")]
  assert scenes,"No matching wallpapers"
  for project in scenes:
   scene=project.parent;file=out/(scene.name+'.png');file.unlink(missing_ok=True)
   run=env.copy()
-  if scene.name=='3721991999':run['LWE_SCREENSHOT_REFERENCE']='1'
+  if scene.name==os.environ.get('WALLPAPER_TEST_REFERENCE',''):run['LWE_SCREENSHOT_REFERENCE']='1'
   with (out/(scene.name+'.log')).open('w') as log:
    renderer=subprocess.Popen([str(executable),'--window','0x0x1920x1080','--fps','15','--silent','--no-audioreactive','--no-fullscreen-pause','--scaling','fill','--screenshot',str(file),'--screenshot-delay','45','--assets-dir',str(assets),str(scene)],env=run,stdout=log,stderr=log,start_new_session=True)
    last=0
@@ -78,7 +78,7 @@ try:
   stop(renderer);renderer=None
   assert (pix.get_width(),pix.get_height())==(1920,1080)
   result={'id':scene.name,'image':str(file),'size':[1920,1080]}
-  if scene.name=='3721991999':result['same_frame_reference']=legacy_capture(file)
+  if scene.name==os.environ.get('WALLPAPER_TEST_REFERENCE',''):result['same_frame_reference']=legacy_capture(file)
   results.append(result);print('PASS: '+scene.name+' 1920x1080 filtered screenshot',flush=True)
  (out/'summary.json').write_text(json.dumps({'passed':True,'captures':results,'live_desktop_modified':False},ensure_ascii=False,indent=2)+'\n')
 finally:stop(renderer);stop(shell)

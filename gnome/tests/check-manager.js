@@ -29,6 +29,17 @@ const settings=new Gio.Settings({schema_id:'org.gnome.shell.extensions.wallpaper
 const ext={_settings:settings,_resolveScenePath:()=>scene,_proc:null,_rendererReady:false};
 const loop=GLib.MainLoop.new(null,false);
 const manager=new WallpaperManager(ext);
+let stops=0,starts=0;
+ext._stopEngine=()=>stops++;ext._startEngine=()=>starts++;
+settings.set_string('selected-id','');manager.items=[];manager.select();
+let fresh=JSON.parse(settings.get_string('runtime-status'));
+assert(fresh.state==='static'&&!fresh.error&&!fresh.pid&&!fresh.dynamic,'fresh selection reported as missing wallpaper');
+assert(stops===1&&starts===0&&!manager.timer&&!manager.watchdog,'fresh setup started background work');
+manager.reload();manager.select();
+assert(!JSON.parse(settings.get_string('runtime-status')).error,'import without selection reported as missing wallpaper');
+settings.set_string('selected-id','missing');manager.select();
+assert(JSON.parse(settings.get_string('runtime-status')).state==='error','missing saved selection must still report an error');
+settings.set_string('selected-id','item');
 const temporary=manager.prepareCapture(scene);assert(temporary,'missing image did not request capture');
 // The user supplies a red image while a blue automatic capture is in flight.
 replaceStaticImage(scene,root+'/red.png');

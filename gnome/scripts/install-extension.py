@@ -5,6 +5,8 @@ import argparse,ctypes,datetime,json,os,pathlib,shutil,subprocess,tempfile
 def install(source,destination):
     source=pathlib.Path(source).resolve();destination=pathlib.Path(destination).absolute()
     if source==destination:raise ValueError('Source and destination must differ')
+    if (destination/'package-manifest.json').exists():
+        raise ValueError('This is a full-package installation; use packaging/install.py or make install instead of the legacy JS installer')
     metadata=json.loads((source/'metadata.json').read_text())
     if metadata.get('uuid')!='wallpaperengine@waylandwe':raise ValueError('Unexpected extension UUID')
     destination.parent.mkdir(parents=True,exist_ok=True)
@@ -15,6 +17,10 @@ def install(source,destination):
         for file in source.glob('*.js'):shutil.copy2(file,stage/file.name)
         shutil.copy2(source/'libraryWorker.py',stage/'libraryWorker.py') if (source/'libraryWorker.py').exists() else None
         if (source/'captureWorker.py').exists():shutil.copy2(source/'captureWorker.py',stage/'captureWorker.py')
+        for name in ['common','helpers','backend','licenses','resources']:
+            if (source/name).is_dir():shutil.copytree(source/name,stage/name,symlinks=False)
+        for name in ['VERSION','package-manifest.json']:
+            if (source/name).is_file():shutil.copy2(source/name,stage/name)
         shutil.copy2(source/'metadata.json',stage/'metadata.json')
         for name in ['LICENSE','NOTICE.md']:
             notice=source/name
