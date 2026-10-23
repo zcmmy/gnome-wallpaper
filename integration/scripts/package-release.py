@@ -6,7 +6,7 @@ source_dir=pathlib.Path(os.environ.get('WALLPAPER_DEPENDENCY_SOURCES','/nonexist
 source_index=source_dir/'sources.json'
 if not source_index.is_file():raise SystemExit('Collect exact dependency sources with packaging/fetch-sources.py first; set WALLPAPER_DEPENDENCY_SOURCES. No incomplete Release will be built.')
 version=(root/'VERSION').read_text().strip();out=pathlib.Path(sys.argv[1]).absolute() if len(sys.argv)>1 else root/'dist'/version
-build=pathlib.Path(os.environ.get('WALLPAPER_BUILD_DIR',root/'build/package-renderer'))
+build=pathlib.Path(os.environ.get('WALLPAPER_BUILD_DIR') or root/'build/package-renderer')
 subprocess.run([sys.executable,str(root/'packaging/build-package.py'),'--build-dir',str(build),'--output',str(out)],check=True)
 manifest=json.loads((out/'backend-manifest.json').read_text());index=json.loads(source_index.read_text())
 sys.path.insert(0,str(root/'packaging'))

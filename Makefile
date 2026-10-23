@@ -49,6 +49,7 @@ clean-tests-apply:
 	python3 -B integration/scripts/maintenance.py clean-tests --apply
 
 check-packaging:
+	python3 packaging/test-release.py
 	python3 packaging/test-data.py
 	python3 packaging/test-install.py
 	python3 packaging/test-sources.py
