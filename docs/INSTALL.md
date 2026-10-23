@@ -31,62 +31,32 @@ Debian 可使用 `fonts-noto-cjk` 覆盖中日韩文字。它是系统字体依�
 多语言回归还需要 `fonts-dejavu-core`；其他发行版可用 `UNICODE_TEST_LATIN_FONT` 与
 `UNICODE_TEST_CJK_FONT` 指定等效字体路径。详见 [多语言文字](UNICODE-TEXT.md)。
 
-## 2. 用户资源（不要提交到 Git）
+## 2. 用户资源
 
-将合法持有的 Wallpaper Engine 安装目录 assets 复制到项目 assets/。
-将已下载的 Workshop 壁纸目录放在 wallpapers/<ID>/，通常包含 project.json、scene.pkg 或视频。
-可选静态图命名为 static-background.png；用户提供的静态图优先，不会自动覆盖。
-当前预览、历史测试和运行包仍需要 wallpaper/ 兼容样本目录：从自己的场景壁纸完整复制一份。
-无权再分发的壁纸、静态图、音频、字体和 WE assets 均不进入源码发布。
+正常使用时，在完整插件的管理界面导入自备公共 assets 与壁纸，不需要将资源放到源码仓库。
+它们保存在标准用户数据目录，程序更新不删除资源或用户静态图。
+源码中的 assets/、wallpapers/、wallpaper/ 仅供旧版开发工具和私人测试，Git 忽略这些目录。
 
-## 3. 构建与生成运行包
+## 3. 构建、打包与安装
 
-```text
-make renderer
-make extension
+从源码进行完整包构建，使用以下流程：
+
+```bash
+make package-backend
 make check
-make package DEST="$HOME/.local/share/gnome-wallpaper-runtime"
+# 将需要打包的程序和文档改动提交到 Git，保持源码快照与安装内容一致。
+make extension DEST="$PWD/dist/local-package"
+python3 dist/local-package/install.py dist/local-package/gnome-wallpaper-v0.0.3-linux-x86_64.shell-extension.zip
 ```
 
-目标必须尚不存在；已有运行目录应先备份，再向新目录打包，避免覆盖用户图库。
-bin/check-runtime 验证动态库与资源是否齐全；运行包只覆盖 scene/video 使用路径。
+已有通过构建记录检查的后端时，可以直接执行 `make install`。
+它在临时目录组包，再调用完整包原子安装器；不会重新编译，不依赖源码软链接运行，也不会自动启用扩展。
+自定义构建位置可设置 `WALLPAPER_BUILD_DIR`，但不得借用其他 checkout 的构建缓存。
+新架构完整说明见 [完整包安装与数据管理](FULL-PACKAGE.md)。
 
-## 4. 显式安装和配置
+## 4. 历史开发入口
 
-设 RUNTIME 为上一步生成的绝对路径，运行：
-
-```text
-"$RUNTIME/bin/check-runtime"
-"$RUNTIME/bin/install-gnome"
-"$RUNTIME/bin/configure-gnome"
-```
-
-configure-gnome 会写入该运行包的路径并重置动态/轮换为关闭、FPS 为 15。初始化脚本清空当前素材选择。
-请在管理界面选择自己导入的壁纸；项目不提供素材或其信息。不要在已有配置上无意重复执行此初始化命令。
-新安装扩展若未被当前 Shell 发现，在方便时重新登录；脚本不会自动注销或重启。
-
-```text
-gnome-extensions enable wallpaperengine@waylandwe
-"$RUNTIME/bin/manager"
-```
-
-扩展管理器的开关控制整个插件；管理界面中的“动态模式”控制渲染器。
-标准扩展启用列表属于 GNOME 持久配置，后续登录可能自动恢复该扩展；本项目不创建独立启动服务。
-不要将开发期 apply-*.js Looking Glass 迁移脚本作为常规安装步骤。
-
-## 5. 停止与恢复
-
-在管理界面关闭动态模式即可停止渲染并保留原生静态壁纸。
-
-```text
-gnome-extensions disable wallpaperengine@waylandwe
-```
-
-可关闭整个扩展；需要恢复首次启用前原生背景时，再执行运行包 bin/restore-background。
-静态图库和回收站属于用户数据，卸载扩展时不要一并删除。
-
-## 6. 安全更新
-
-插件必须通过 install-extension.py / bin/install-gnome 原子交换目录。
-不要原地覆盖正在映射的 gschemas.compiled，也不要在活动扩展目录重新编译 schema。
-替换二进制和共享库应通过临时文件加原子重命名；当前会话代码不会因为磁盘变化而自动重载。
+`make renderer`、`make package DEST=...` 和 runtime/bin 下的配置工具保留供旧版独立 runtime 开发使用。
+`make extension-dev` 只生成 JS/Python 开发包，不能替代包含 C++ 后端的完整包。
+这些入口的旧流程见 [独立运行包](RUNTIME.md)，不用于升级当前完整插件。
+`gnome/scripts/install-extension.py` 拒绝覆盖已安装的完整包；正式安装使用 `make install` 或完整包附带的 `install.py`。
