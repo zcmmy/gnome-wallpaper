@@ -11,7 +11,7 @@ GNOME 负责窗口归属/层级、原生静态背景、概览、鼠标桥、UI �
 
 `packaging/build-backend.sh` 使用路径映射编译后端，`packaging/build-package.py` 组装程序白名单和依赖闭包。
 `common/paths.js` 管理程序与 XDG 数据路径，`helpers/dataWorker.py` 管理资源事务，`resourceSetup.js` 提供导入及迁移界面。
-`packaging/install.py` 负责校验、停止自身任务、原子安装与回滚。当前桌面不随构建迁移。
+`packaging/install.py` 负责校验、停止自身任务、原子安装与回滚。当前桌面不随构建迁移。`make install` 是显式安装入口，复用已有后端构建和完整包原子安装器。
 完整验收和运行说明见 [完整包](FULL-PACKAGE.md)。
 
 ## 构建
@@ -29,7 +29,7 @@ BUILD_JOBS 控制构建并发；WALLPAPER_BUILD_DIR 可指定新构建目录。
 WALLPAPER_RENDERER_BIN 可指定已构建程序；WALLPAPER_SCENE/WALLPAPER_ASSETS 可覆盖预览资源。
 deps/sysroot/usr 通过 renderer/scripts/env.sh 注入工具链路径，不安装到系统目录。
 
-## 打包与安装
+## 旧版独立 runtime 打包与安装
 
 ```text
 make package DEST=/一个尚不存在的新目录
@@ -37,7 +37,8 @@ python3 integration/tests/check-runtime-bundle.py /运行目录
 ```
 
 打包生成可整体移动的运行包，不安装插件或修改设置。
-安装器：gnome/scripts/install-extension.py SOURCE DESTINATION，或运行包 bin/install-gnome。
+以下仅用于旧版 runtime 开发。完整插件使用 `make extension` 生成 ZIP 或 `make install` 直接从已有构建安装。
+旧安装器：gnome/scripts/install-extension.py SOURCE DESTINATION，或运行包 bin/install-gnome；它拒绝覆盖已安装的完整包。
 安装器在暂存目录编译 schema 后原子交换整个插件目录，并保留旧目录。
 不要原地覆盖已加载的 gschemas.compiled 或在活动扩展目录中重新编译 schema；GSettings 映射其 inode。
 更新可执行文件/共享库也应复制到临时文件后 rename，避免截断运行中的映射。

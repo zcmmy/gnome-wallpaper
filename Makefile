@@ -3,13 +3,13 @@ SHELL := /bin/bash
 export DEST
 export WALLPAPER_BUILD_DIR
 
-.PHONY: extension-dev package-backend check-packaging release-package help build renderer extension check check-renderer check-gnome check-maintenance check-licenses check-integration check-overview check-runtime-capture stage-manager stage-ui package inventory clean-tests clean-tests-apply
+.PHONY: install extension-dev package-backend check-packaging release-package help build renderer extension check check-renderer check-gnome check-maintenance check-licenses check-integration check-overview check-runtime-capture stage-manager stage-ui package inventory clean-tests clean-tests-apply
 
 release-package:
 	python3 integration/scripts/package-release.py
 
 help:
-	@printf '%s\n' 'build / renderer / extension: build only; no installation' 'release-package: full release assets and sources in dist/VERSION (must not exist)' 'check: renderer, GNOME, license notices and cleanup safety checks' 'check-integration / check-overview: isolated graphical tests' 'stage-manager / stage-ui: prepare isolated test sessions' 'package DEST=/new/path: create an independent runtime' 'inventory: directory sizes and Git status' 'clean-tests: preview disposable test directories' 'clean-tests-apply: remove stopped test directories after safety checks'
+	@printf '%s\n' 'build / renderer / extension: build only; no installation' 'install: package an existing backend build and explicitly install the full extension' 'release-package: full release assets and sources in dist/VERSION (must not exist)' 'check: renderer, GNOME, license notices and cleanup safety checks' 'check-integration / check-overview: isolated graphical tests' 'stage-manager / stage-ui: prepare isolated test sessions' 'package DEST=/new/path: create an independent runtime' 'inventory: directory sizes and Git status' 'clean-tests: preview disposable test directories' 'clean-tests-apply: remove stopped test directories after safety checks'
 
 build: package-backend
 	$(MAKE) extension
@@ -56,3 +56,6 @@ check-packaging:
 
 package-backend:
 	bash packaging/build-backend.sh
+
+install:
+	python3 packaging/install-from-build.py --build-dir "$${WALLPAPER_BUILD_DIR:-$(CURDIR)/build/package-renderer}"

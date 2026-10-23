@@ -21,6 +21,35 @@ python3 install.py ./gnome-wallpaper-<版本>-linux-x86_64.shell-extension.zip
 正常启用扩展后，在设置中导入自己的公共 assets 和壁纸；已有静态图可直接使用静态模式。
 只有显式开启动态才启动后端，默认 15 FPS；场景辅助截图仍独立以 4K 渲染并缩小到 1080p。
 
+## 从已经构建的源码打包和安装
+
+在本仓库根目录中操作。开发依赖可以安装在系统中；不要求本机私有 `deps/` 目录。
+若主动配置了私有 `deps/sysroot`，它必须完整可用，脚本不会悄悄切换到另一套库。
+
+```bash
+# 首次构建后端；只构建，不安装。
+make package-backend
+# 保存本次程序改动到 Git 后，从已有构建生成完整安装包；输出目录必须尚不存在。
+make extension DEST="$PWD/dist/my-package"
+# 使用该安装包安装完整插件。
+python3 dist/my-package/install.py dist/my-package/gnome-wallpaper-v0.0.3-linux-x86_64.shell-extension.zip
+```
+
+也可以在已有后端构建的源码目录直接执行：
+
+```bash
+make install
+```
+
+`make install` 在临时目录组装完整包，再交给同一个原子安装器确认并安装，结束后清理临时包。
+它不重新编译、不把源码链接进安装目录、不导入资源、不启用扩展；当前会话的模块缓存规则与普通安装相同。
+自定义构建目录使用 `WALLPAPER_BUILD_DIR=/构建目录 make extension` 或 `WALLPAPER_BUILD_DIR=/构建目录 make install`。
+构建目录必须属于当前 checkout，不能混用另一份源码的 CMake 缓存；源码位置改变后应重新配置构建。
+打包检查源码树与二进制记录，拒绝未提交的打包输入和混用 checkout，确保对应源码与程序一致。
+
+`make extension-dev` 和 `gnome/scripts/install-extension.py` 是旧版 JS 开发入口，不能安装完整插件。
+旧安装器拒绝覆盖已安装的完整包；新架构使用 `make install` 或 `packaging/install.py`。
+
 ## 数据与迁移
 
 程序安装在标准 GNOME 扩展目录，用户数据在 `$XDG_DATA_HOME/gnome-wallpaper/`。

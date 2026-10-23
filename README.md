@@ -51,6 +51,7 @@ make renderer               编译 C++，可能下载固定版本的 CEF 构建�
 make package-backend        构建完整包使用的后端（不安装系统组件）
 make extension              组装完整插件候选包，不安装、不启用
 make extension-dev          仅打包 JS/Python，供开发测试使用
+make install                从已有后端构建组包并显式安装完整插件
 make check                  本地回归；C++ 视频测试需要已构建的渲染库
 make package DEST=/新目录   打包独立运行目录，目标必须不存在
 ```

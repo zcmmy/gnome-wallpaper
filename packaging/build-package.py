@@ -26,9 +26,27 @@ def check_source_snapshot(repo):
             if pathlib.PurePosixPath(target).is_absolute() or normalized=='..' or normalized.startswith('../'):
                 raise ValueError('Machine-specific or escaping source symlink: '+name)
 
+def check_package_checkout(repo):
+    inputs=['renderer/source','gnome/extension','packaging','integration/scripts','third_party',
+            'Makefile','VERSION','LICENSE','NOTICE.md','docs']
+    if run('git','-C',str(repo),'status','--porcelain','--untracked-files=normal','--',*inputs):
+        raise ValueError('Commit package inputs before packaging so the corresponding source matches the installed files')
+
+def resolve_sysroot():
+    candidate=ROOT/'deps/sysroot/usr'
+    if candidate.is_dir():return candidate.resolve()
+    if (ROOT/'deps').exists() or (ROOT/'deps').is_symlink():
+        raise ValueError('Configured deps/sysroot/usr is missing; repair the local toolchain before packaging')
+    return pathlib.Path('/usr')
+
+def check_build_checkout(home):
+    if home.resolve()!=(ROOT/'renderer/source').resolve():
+        raise ValueError('Build belongs to a different checkout; package from that checkout or rebuild here')
+
 def source_identity(output):
     cache=(output.parent/'CMakeCache.txt').read_text()
     home=pathlib.Path(re.search(r'^CMAKE_HOME_DIRECTORY:INTERNAL=(.+)$',cache,re.M)[1])
+    check_build_checkout(home)
     repo=pathlib.Path(run('git','-C',str(home),'rev-parse','--show-toplevel'))
     return {'commit':run('git','-C',str(repo),'rev-parse','HEAD'),'repository':'https://github.com/zcmmy/gnome-wallpaper',
             'compiler':run('c++','--version').splitlines()[0],'configuration':'Release', 'source_root':repo,
@@ -57,7 +75,7 @@ def package_identity(path,soname,sysroot):
             'source_url':'https://snapshot.debian.org/package/'+source+'/'+source_version+'/', 'copyright':copyright}
 def build(args):
     if platform.machine()!='x86_64':raise ValueError('Only linux-x86_64 is currently supported')
-    output=args.build_dir.resolve()/'output';sysroot=(ROOT/'deps/sysroot/usr').resolve()
+    output=args.build_dir.resolve()/'output';sysroot=resolve_sysroot()
     env=dict(os.environ,LD_LIBRARY_PATH=f'{output}:{sysroot}/lib/x86_64-linux-gnu:{sysroot}/lib')
     linked=run('ldd',str(output/'linux-wallpaperengine'),env=env)
     if 'not found' in linked:raise ValueError(linked)
@@ -65,6 +83,7 @@ def build(args):
     out=args.output.absolute();out.mkdir(parents=True,exist_ok=False)
     identity=source_identity(output);source_repo=identity.pop('source_root')
     check_source_snapshot(source_repo)
+    check_package_checkout(source_repo)
     identity['cmake_flags']={k:v.replace(str(source_repo),'<SOURCE>').replace(str((ROOT/'deps').resolve()),'<DEPS>') for k,v in identity['cmake_flags'].items()}
     if run('git','-C',str(source_repo),'status','--porcelain','--','renderer/source'):
         raise ValueError('Commit renderer sources before archiving corresponding source')

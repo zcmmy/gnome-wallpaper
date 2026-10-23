@@ -5,6 +5,8 @@ import argparse,ctypes,datetime,json,os,pathlib,shutil,subprocess,tempfile
 def install(source,destination):
     source=pathlib.Path(source).resolve();destination=pathlib.Path(destination).absolute()
     if source==destination:raise ValueError('Source and destination must differ')
+    if (destination/'package-manifest.json').exists():
+        raise ValueError('This is a full-package installation; use packaging/install.py or make install instead of the legacy JS installer')
     metadata=json.loads((source/'metadata.json').read_text())
     if metadata.get('uuid')!='wallpaperengine@waylandwe':raise ValueError('Unexpected extension UUID')
     destination.parent.mkdir(parents=True,exist_ok=True)

@@ -34,6 +34,13 @@ class InstallerTests(unittest.TestCase):
             installer.restore_legacy_program_settings(self.root,{'wallpaperengine-path':'/old program/renderer','engine':'wallpaperengine'})
         self.assertEqual([c.args[0][3] for c in run.call_args_list],['wallpaperengine-path','engine'])
         self.assertNotIn('fps',str(run.call_args_list));self.assertNotIn('library-root',str(run.call_args_list))
+    def test_legacy_installer_rejects_full_package_destination(self):
+        path=pathlib.Path(__file__).resolve().parents[1]/'gnome/scripts/install-extension.py'
+        spec=importlib.util.spec_from_file_location('legacy',path);legacy=importlib.util.module_from_spec(spec);spec.loader.exec_module(legacy)
+        old=self.root/'installed';old.mkdir();(old/'package-manifest.json').write_text('{}');(old/'keep').write_text('unchanged')
+        with self.assertRaises(ValueError):legacy.install(self.root/'source',old)
+        self.assertEqual((old/'keep').read_text(),'unchanged')
+        self.assertEqual(set(p.name for p in old.iterdir()),{'package-manifest.json','keep'})
     def test_rollback_preserves_user_data(self):
         current=self.root/'installed';current.mkdir();(current/'data').write_text('new');old=self.root/'old';old.mkdir();(old/'data').write_text('old');user=self.root/'wallpapers';user.mkdir();(user/'static.png').write_text('user')
         installer.exchange(old,current);self.assertEqual((current/'data').read_text(),'old');self.assertEqual((user/'static.png').read_text(),'user')
