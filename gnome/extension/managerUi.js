@@ -6,6 +6,7 @@ import GdkPixbuf from 'gi://GdkPixbuf';
 import {readLibrary, replaceStaticImage, imageInfo} from './library.js';
 import {fileOperation, deleteWallpaper, refreshFiles} from './libraryOps.js';
 import {addResourceSetup} from './resourceSetup.js';
+import {assetsReady} from './common/paths.js';
 import {restoreStaticWallpaper} from './staticWallpaper.js';
 
 function button(label, callback, style = null) {
@@ -69,6 +70,11 @@ export function fillManagerWindow(window, settings) {
     };
     widen(page);
 
+    const setupGroup = new Adw.PreferencesGroup({title:'首次使用',description:'先导入自备的 assets 和壁纸文件夹，再选择壁纸并点击应用。导入不会开启动态播放。'});
+    const setupActions = new Gtk.Box({spacing:8});
+    setupActions.append(button('导入 assets…',()=>resourceSetup.choose('assets')));
+    setupActions.append(button('导入壁纸…',()=>resourceSetup.choose('import')));
+    setupGroup.add(setupActions); page.add(setupGroup);
     const stateGroup = new Adw.PreferencesGroup({title:'桌面壁纸'}); page.add(stateGroup);
     const stateRow = new Adw.ActionRow({title:'静态模式', subtitle:'选择壁纸后点击应用；浏览图片不会改变桌面。'});
     const mode = new Gtk.Switch({valign:Gtk.Align.CENTER, tooltip_text:'开启动态后，后续切换和轮换继续使用动态模式'});
@@ -200,6 +206,7 @@ export function fillManagerWindow(window, settings) {
         }
         if (!flow.get_selected_children().length && flow.get_first_child())flow.select_child(flow.get_first_child());
         if(!model.items.length)show(null);
+        setupGroup.set_visible(!assetsReady() || !model.items.length);
         gallery.set_title(`本地壁纸 · ${model.items.length} 张`);
         rebuildRotation(); updateStatus();
     }
@@ -282,5 +289,5 @@ export function fillManagerWindow(window, settings) {
     window.connect('close-request',()=>{if(busy){toast('正在处理壁纸文件，请稍候');return true;}model.closed=true;if(rotationRebuild)GLib.source_remove(rotationRebuild);rotationRebuild=0;cancel.cancel();for(const id of signals)settings.disconnect(id);signals.length=0;return false;});
     reload();
     // Exposed to the isolated UI driver; no automatic actions or timers.
-    return {resourceSetup,model,flow,search,filter,apply,mode,importButton,removeButton,capture,runtimeCapture,fps,rotate,interval,sequence,all,rotationList:list,reload,show,pages:[page,rotationPage,options]};
+    return {resourceSetup,setupGroup,model,flow,search,filter,apply,mode,importButton,removeButton,capture,runtimeCapture,fps,rotate,interval,sequence,all,rotationList:list,reload,show,pages:[page,rotationPage,options]};
 }

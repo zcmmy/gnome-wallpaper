@@ -73,3 +73,8 @@ Wayland 生成代码声明。测试仅使用临时合成文件，不访问图库
 该图形测试需要本机自备 runtime 资源和已安装的兼容性测试扩展；通过 `WALLPAPER_TEST_RUNTIME` 指定私有资源目录，默认选择其中一张已有静态图的场景，也可设置 `WALLPAPER_TEST_ID`。加 `--video` 改用自动生成的合成视频，公共 assets 仍由用户自备。测试不修改真实桌面设置。
 
 旧集成脚本需要显式设置 `WALLPAPER_TEST_SCENE_A`、`WALLPAPER_TEST_SCENE_B`、`WALLPAPER_TEST_SCENE_C` 和 `WALLPAPER_TEST_REFERENCE`，分别填写自己测试库中的条目 ID；不再内置真实素材 ID。旧脚本保留历史 runtime 布局约定，完整包验收使用上述新入口。
+
+## 首次使用引导回归
+
+`python3 gnome/tests/check-first-use-ui.py` 在独立 XDG、DBus 和 headless GNOME 会话中，检查空图库的导入引导、assets 与壁纸分别导入，以及导入不自动选择壁纸或开启动态。
+该自动测试使用合成素材，不代替用户亲自操作文件选择器的真实桌面验收。

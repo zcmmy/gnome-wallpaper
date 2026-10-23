@@ -98,7 +98,10 @@ export class WallpaperManager {
         const scene = e._resolveScenePath();
         if (root && !this.current) {
             e._restartPending = false; e._stopEngine();
-            this.error = '所选壁纸不存在，请刷新壁纸库或选择其他壁纸。'; this.publish(); return;
+            // A fresh library has no selection yet; that is an idle state, not a missing-file error.
+            if (this.settings.get_string('selected-id'))
+                this.error = '所选壁纸不存在，请刷新壁纸库或选择其他壁纸。';
+            this.publish(); return;
         }
         try {
             const applied = applyStaticWallpaper(scene, this.settings.get_string('scaling'));
