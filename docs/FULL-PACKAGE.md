@@ -1,15 +1,15 @@
 # 完整插件安装与数据管理
 
-开发中的完整发行包面向 Debian 13 / GNOME 48 / Wayland / x86_64。
+v0.1.0 完整发行包面向 Debian 13 / GNOME 48 / Wayland / x86_64。
 它包含场景/视频后端及私有运行库；图形驱动、GNOME 桌面、Python/PyGObject、Fontconfig 配置与字体由系统提供；中文、日文、韩文显示需要对应字体。
 安装器预检宿主与后端依赖，不在安装时联网或编译后端。当前构建不是跨发行版通用二进制。
 
 ## 安装
 
-将同次构建的全部附件放在同一目录，先校验：
+将同次 Release 的程序 ZIP、install.py 和 SHA256SUMS 放在同一目录，先校验已下载文件；完整源码附件为可选下载：
 
 ```bash
-sha256sum --check SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS
 python3 install.py ./gnome-wallpaper-<版本>-linux-x86_64.shell-extension.zip
 ```
 
@@ -32,7 +32,7 @@ make package-backend
 # 保存本次程序改动到 Git 后，从已有构建生成完整安装包；输出目录必须尚不存在。
 make extension DEST="$PWD/dist/my-package"
 # 使用该安装包安装完整插件。
-python3 dist/my-package/install.py dist/my-package/gnome-wallpaper-v0.0.3-linux-x86_64.shell-extension.zip
+python3 dist/my-package/install.py dist/my-package/gnome-wallpaper-v0.1.0-linux-x86_64.shell-extension.zip
 ```
 
 也可以在已有后端构建的源码目录直接执行：
@@ -80,7 +80,7 @@ make extension DEST=/新的输出目录
 `backend-manifest.json` 列出宿主 ABI、私有库、哈希、来源包、头文件/协议源码输入、构建参数和提交；组包前核对后端构建记录与二进制哈希。
 `renderer-corresponding-source.tar.gz` 对应实际后端构建提交；私有 Debian 库的精确源包可由
 `fetch-sources.py backend-manifest.json /新的源码目录` 下载，版本不可替换。收集后用 `packaging/verify_sources.py` 核对 `.dsc` 版本、归档大小与 SHA-256；发行组包会自动执行同一检查。
-公开二进制发布前必须一并提供这些对应源码及构建材料并通过干净环境验收；本轮不自动发布 Release。
+公开二进制发布前必须一并提供这些对应源码及构建材料并通过干净环境验收；发行流程见 [开发说明](DEVELOPMENT.md)。
 
 构建依赖版本记录在 `packaging/debian13-build.lock.json`。`container-build.sh` 只能在一次性 Debian 容器中运行，版本不可用时失败，不自动换成新版本。容器基础镜像标签本身不保证字节级可复现；最终清单和库哈希才是本次产物身份。
 

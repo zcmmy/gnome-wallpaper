@@ -1,9 +1,11 @@
 # 安装与运行
 
+预编译包的下载、校验和安装入口见 [README](../README.md#通过安装包安装)；无需安装下面列出的 C++ 开发依赖。
+
 新架构使用 [完整插件包](FULL-PACKAGE.md)：后端随包安装，资源在界面导入，不再配置 runtime 路径。
 以下依赖说明供开发者构建使用；后面的独立运行包步骤保留为旧版开发流程，不能代替新架构的安装器。
 
-## 1. 系统依赖
+## 源码构建依赖
 
 本地已验证 Debian 13 / GNOME 48 / Wayland / x86_64。
 需要 Git、CMake、Ninja、pkg-config、C++20 编译器，及以下开发库：
@@ -12,7 +14,7 @@ Wayland、wayland-protocols、X11/XRandR、Fontconfig。部分桌面库也由 CE
 Debian 系列可参考以下包名（按发行版调整；本仓库不自动执行安装）：
 
 ```text
-build-essential cmake ninja-build pkg-config git libgl1-mesa-dev libegl1-mesa-dev
+build-essential cmake ninja-build pkg-config git patchelf python3 libglib2.0-dev libgl1-mesa-dev libegl1-mesa-dev
 libglfw3-dev libglew-dev libglm-dev libsdl2-dev libmpv-dev libavcodec-dev
 libavformat-dev libavutil-dev libavdevice-dev libswscale-dev libswresample-dev
 libpulse-dev libdbus-1-dev zlib1g-dev liblz4-dev libfreetype-dev libfontconfig-dev libwayland-dev
@@ -46,7 +48,7 @@ make package-backend
 make check
 # 将需要打包的程序和文档改动提交到 Git，保持源码快照与安装内容一致。
 make extension DEST="$PWD/dist/local-package"
-python3 dist/local-package/install.py dist/local-package/gnome-wallpaper-v0.0.3-linux-x86_64.shell-extension.zip
+python3 dist/local-package/install.py dist/local-package/gnome-wallpaper-v0.1.0-linux-x86_64.shell-extension.zip
 ```
 
 已有通过构建记录检查的后端时，可以直接执行 `make install`。

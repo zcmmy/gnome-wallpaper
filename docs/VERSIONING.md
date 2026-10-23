@@ -1,8 +1,8 @@
 # Git 与版本发布
 
 统一仓库：git@github.com:zcmmy/gnome-wallpaper.git
-稳定分支：main；日常开发分支：dev。当前源码版本：VERSION 中的 v0.0.3；GitHub Release 保持 v0.0.2。
-v0.0.3 附注标签保留在本地。本功能分支将发布工作流改为手动触发；标签与公开发布仍需明确授权。
+稳定分支：main；日常开发分支：dev。当前版本：VERSION 中的 v0.1.0，提供完整预编译 Release。
+历史标签保留，工作流手动触发；标签与公开发布必须由用户明确授权。
 未发布功能先进入 dev，达到发布条件并完成审查后再合并到 main；普通功能提交不代表新版本发布。
 renderer/source、gnome/extension 均是顶层仓库中的普通源码目录，不是 gitlink/submodule。
 采用纳入顶层 Git 的源码快照，让本地补丁可随一次 clone 获得；已裁剪未使用的上游 UI 和演示资源，范围见 third_party/sources.lock.json。
@@ -72,4 +72,4 @@ ZIP 条目固定时间与权限，同一 GLib/Python 工具链下可重复组装
 
 完整包的构建与发布工作流均为手动触发，推送分支或标签不再自动发布。
 构建清单锁定 Debian 13 输入版本；公开发布必须有精确依赖源包、对应后端源码及校验和。
-当前工作区的 `feature/extension-package` 不自动合并、不修改已发布 Release。
+v0.1.0 按用户授权将 `feature/extension-package` 合并至 dev，再合并至 main，保留功能分支；历史 Release 不覆盖。
